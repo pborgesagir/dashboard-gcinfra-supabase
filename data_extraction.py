@@ -194,28 +194,52 @@ class MaintenanceDataExtractor:
             logger.error(f"Failed to insert data to Supabase: {e}")
             return False
 
-    def extract_and_store_data(self, days_back: int = 365) -> bool:
-        """Main method to fetch from both APIs, merge, clean, and store in Supabase."""
-        # This function can remain as it is.
+def extract_and_store_data(self, days_back: int = 365) -> bool:
+        """
+        Main method to fetch from both APIs, merge, clean, and store in Supabase.
+        """
         try:
+            # Date range for the main maintenance query
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_back)
             logger.info(f"Extracting data from {start_date} to {end_date}")
+            
+            # 1. Fetch main maintenance data
             raw_maintenance_data = self.fetch_maintenance_data(start_date, end_date)
             if not raw_maintenance_data:
                 logger.warning("No maintenance data received from API. Halting process.")
                 return False
             maintenance_df = pd.DataFrame(raw_maintenance_data)
+            
+            # --- START: KEY CHANGE ---
+            # The API returns duplicates for the same 'os'. We remove them here, keeping the last entry.
+            initial_rows = len(maintenance_df)
+            maintenance_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
+            final_rows = len(maintenance_df)
+            if initial_rows > final_rows:
+                logger.info(f"Removed {initial_rows - final_rows} duplicate 'os' records.")
+            # --- END: KEY CHANGE ---
+
+            # 2. Fetch equipment data
             equipment_df = self.fetch_equipment_data()
+            
+            # 3. Merge dataframes
             if not equipment_df.empty:
                 logger.info(f"Merging maintenance data ({maintenance_df.shape[0]} rows) with equipment data ({equipment_df.shape[0]} rows) on 'tag'.")
+                # Perform a left merge to keep all maintenance orders
                 merged_df = pd.merge(maintenance_df, equipment_df, on='tag', how='left')
             else:
                 logger.warning("Equipment data is empty. Proceeding without merging.")
                 merged_df = maintenance_df
+
+            # 4. Clean and transform the merged data
             cleaned_df = self.clean_and_transform_data(merged_df)
+            
+            # 5. Insert data to Supabase
             success = self.insert_data_to_supabase(cleaned_df)
+            
             return success
+            
         except Exception as e:
             logger.error(f"An error occurred in the main process: {e}", exc_info=True)
             return False
