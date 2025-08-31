@@ -5,8 +5,8 @@ name: Daily Database Update
 on:
   workflow_dispatch: # Permite acionar o workflow manualmente no GitHub
   schedule:
-    # Executa todo dia à meia-noite (00:00 UTC)
-    - cron: "0 15 * * *"
+    # Executa todo dia às 17:25 UTC
+    - cron: "25 17 * * *"
 
 jobs:
   update-data:
