@@ -49,15 +49,8 @@ class MaintenanceDataExtractor:
             'tombamento', 'cadastro', 'instalacao', 'garantia', 'verificacao'
         ]
 
-    # ... (create_table_if_not_exists and fetch_maintenance_data methods remain the same) ...
-    def create_table_if_not_exists(self):
-        """Logs the SQL command needed to create the table."""
-        # This function can remain as it is.
-        pass
-
     def fetch_maintenance_data(self, start_date: datetime, end_date: datetime) -> List[Dict]:
         """Fetch data from the main maintenance orders API (consulta_os)."""
-        # This function can remain as it is.
         formatted_start = start_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         formatted_end = end_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         url = f"{self.API_CONFIG['base_url_os']}?data_abertura_inicio={formatted_start}&data_abertura_fim={formatted_end}&situacao_int=0,1,2,3,4,5,6,7,8,9,10,11"
@@ -74,78 +67,47 @@ class MaintenanceDataExtractor:
             return []
 
     def fetch_equipment_data(self) -> pd.DataFrame:
-        """
-        Fetch data from the equipment API and RENAME columns to match the database.
-        """
+        """Fetch data from the equipment API and RENAME columns to match the database."""
         url = self.API_CONFIG['base_url_equipamento']
         headers = {
             'Content-Type': 'application/json',
             self.API_CONFIG['api_key_header']: self.API_CONFIG['token'],
             'Usuario': self.API_CONFIG['user']
         }
-        
         try:
             logger.info("Fetching equipment data from consulta_equipamento API...")
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             data = response.json()
             logger.info(f"Fetched {len(data)} equipment records from API.")
-            
             if not data:
                 return pd.DataFrame()
-
             df = pd.DataFrame(data)
-
-            # --- START: KEY CHANGE ---
-            # Define a mapping from expected API column names to our database column names.
-            # It's better to be explicit. Add or change mappings here as needed.
             column_mapping = {
-                'Tag': 'tag',
-                'Familia': 'familia',
-                'Modelo': 'modelo',
-                'TipoEquipamento': 'tipoequipamento',
-                'Fabricante': 'fabricante',
-                'NSerie': 'nserie',
-                'Tombamento': 'tombamento',
-                'Cadastro': 'cadastro',
-                'Instalacao': 'instalacao',
-                'Garantia': 'garantia',
-                'Verificacao': 'verificacao'
+                'Tag': 'tag', 'Familia': 'familia', 'Modelo': 'modelo',
+                'TipoEquipamento': 'tipoequipamento', 'Fabricante': 'fabricante',
+                'NSerie': 'nserie', 'Tombamento': 'tombamento', 'Cadastro': 'cadastro',
+                'Instalacao': 'instalacao', 'Garantia': 'garantia', 'Verificacao': 'verificacao'
             }
-
-            # Rename columns based on the mapping.
             df.rename(columns=column_mapping, inplace=True)
-            # --- END: KEY CHANGE ---
-
-            # The 'tag' column is essential for the merge. If it's not present after renaming, stop.
             if 'tag' not in df.columns:
                 logger.error("'tag' column not found in equipment data after renaming. Cannot merge.")
                 return pd.DataFrame()
-
-            # Define the final columns we need from this source.
             equipment_cols = [
-                'tag', 'familia', 'modelo', 'tipoequipamento', 'fabricante', 
-                'nserie', 'tombamento', 'cadastro', 'instalacao', 'garantia', 'verificacao'
+                'tag', 'familia', 'modelo', 'tipoequipamento', 'fabricante', 'nserie', 
+                'tombamento', 'cadastro', 'instalacao', 'garantia', 'verificacao'
             ]
-            
-            # Ensure all required columns exist, adding them with None if they don't
             for col in equipment_cols:
                 if col not in df.columns:
                     df[col] = None
-            
-            # Keep only relevant columns and remove duplicates by 'tag' to ensure a clean merge.
             df = df[equipment_cols].drop_duplicates(subset=['tag'], keep='first')
-            
             return df
-            
         except requests.exceptions.RequestException as e:
             logger.error(f"Equipment API request failed: {e}")
             return pd.DataFrame()
 
-    # ... (clean_and_transform_data, insert_data_to_supabase, extract_and_store_data methods remain the same) ...
     def clean_and_transform_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and transform the merged DataFrame."""
-        # This function can remain as it is.
         if df.empty:
             return pd.DataFrame()
         for col in self.columns:
@@ -171,7 +133,6 @@ class MaintenanceDataExtractor:
 
     def insert_data_to_supabase(self, df: pd.DataFrame) -> bool:
         """Insert data into Supabase using upsert."""
-        # This function can remain as it is.
         if df.empty:
             logger.info("No data to insert.")
             return True
@@ -194,64 +155,49 @@ class MaintenanceDataExtractor:
             logger.error(f"Failed to insert data to Supabase: {e}")
             return False
 
-def extract_and_store_data(self, days_back: int = 365) -> bool:
-        """
-        Main method to fetch from both APIs, merge, clean, and store in Supabase.
-        """
+    def extract_and_store_data(self, days_back: int = 365) -> bool:
+        """Main method to fetch from both APIs, merge, clean, and store in Supabase."""
         try:
-            # Date range for the main maintenance query
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_back)
             logger.info(f"Extracting data from {start_date} to {end_date}")
-            
-            # 1. Fetch main maintenance data
             raw_maintenance_data = self.fetch_maintenance_data(start_date, end_date)
             if not raw_maintenance_data:
                 logger.warning("No maintenance data received from API. Halting process.")
                 return False
             maintenance_df = pd.DataFrame(raw_maintenance_data)
             
-            # --- START: KEY CHANGE ---
-            # The API returns duplicates for the same 'os'. We remove them here, keeping the last entry.
             initial_rows = len(maintenance_df)
             maintenance_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
             final_rows = len(maintenance_df)
             if initial_rows > final_rows:
                 logger.info(f"Removed {initial_rows - final_rows} duplicate 'os' records.")
-            # --- END: KEY CHANGE ---
 
-            # 2. Fetch equipment data
             equipment_df = self.fetch_equipment_data()
-            
-            # 3. Merge dataframes
             if not equipment_df.empty:
                 logger.info(f"Merging maintenance data ({maintenance_df.shape[0]} rows) with equipment data ({equipment_df.shape[0]} rows) on 'tag'.")
-                # Perform a left merge to keep all maintenance orders
                 merged_df = pd.merge(maintenance_df, equipment_df, on='tag', how='left')
             else:
                 logger.warning("Equipment data is empty. Proceeding without merging.")
                 merged_df = maintenance_df
-
-            # 4. Clean and transform the merged data
+            
             cleaned_df = self.clean_and_transform_data(merged_df)
-            
-            # 5. Insert data to Supabase
             success = self.insert_data_to_supabase(cleaned_df)
-            
             return success
-            
         except Exception as e:
             logger.error(f"An error occurred in the main process: {e}", exc_info=True)
             return False
 
+
 def main():
+    """Main function to run the data extraction."""
     extractor = MaintenanceDataExtractor()
-    # Running for a longer period (e.g., 2 years) ensures older records are updated.
     success = extractor.extract_and_store_data(days_back=730) 
     if success:
         print("✅ Data extraction and storage completed successfully!")
     else:
         print("❌ Data extraction failed. Check logs for details.")
+
 
 if __name__ == "__main__":
     main()
