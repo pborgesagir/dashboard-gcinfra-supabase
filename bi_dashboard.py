@@ -84,17 +84,61 @@ class MaintenanceDashboard:
     @st.cache_data(ttl=300)  # Cache por 5 minutos
     def load_data(_self) -> pd.DataFrame:
         """
-        Carrega os dados do Supabase
+        Carrega TODOS os dados do Supabase usando paginação
         """
         try:
             if not _self.supabase:
                 return pd.DataFrame()
             
-            # Busca os dados do Supabase
-            result = _self.supabase.table('maintenance_orders').select("*").execute()
+            # Primeira consulta para contar o total de registros
+            count_result = _self.supabase.table('maintenance_orders').select("*", count="exact").limit(1).execute()
+            total_count = count_result.count if hasattr(count_result, 'count') else None
             
-            if result.data:
-                df = pd.DataFrame(result.data)
+            if total_count:
+                st.sidebar.info(f"📊 Total de registros no banco: {total_count:,}")
+            
+            # Configurações de paginação
+            page_size = 1000  # Tamanho da página
+            all_data = []
+            offset = 0
+            
+            # Progress bar para mostrar o progresso do carregamento
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            while True:
+                status_text.text(f"Carregando registros {offset + 1} a {offset + page_size}...")
+                
+                # Busca dados com paginação
+                result = _self.supabase.table('maintenance_orders').select("*").range(offset, offset + page_size - 1).execute()
+                
+                if not result.data or len(result.data) == 0:
+                    break
+                
+                all_data.extend(result.data)
+                offset += page_size
+                
+                # Atualiza a barra de progresso
+                if total_count:
+                    progress = min(offset / total_count, 1.0)
+                    progress_bar.progress(progress)
+                
+                # Se retornou menos dados que o page_size, chegamos ao fim
+                if len(result.data) < page_size:
+                    break
+                
+                # Proteção contra loop infinito
+                if offset > 100000:  # Limite máximo de segurança
+                    st.warning("Limite de segurança atingido. Carregamento interrompido.")
+                    break
+            
+            # Remove a barra de progresso e status
+            progress_bar.empty()
+            status_text.empty()
+            
+            if all_data:
+                df = pd.DataFrame(all_data)
+                st.sidebar.success(f"✅ Carregados {len(df):,} registros com sucesso!")
                 
                 # Converte colunas de data
                 date_columns = [
@@ -119,6 +163,109 @@ class MaintenanceDashboard:
                 
         except Exception as e:
             st.error(f"Erro ao carregar os dados: {e}")
+            return pd.DataFrame()
+
+    def load_data_alternative(_self) -> pd.DataFrame:
+        """
+        Método alternativo usando limit() para casos onde range() não funciona
+        """
+        try:
+            if not _self.supabase:
+                return pd.DataFrame()
+            
+            # Tenta carregar com um limite muito alto
+            # Supabase permite até 1000 por padrão, mas pode ser configurado para mais
+            result = _self.supabase.table('maintenance_orders').select("*").limit(10000).execute()
+            
+            if result.data:
+                df = pd.DataFrame(result.data)
+                st.sidebar.info(f"📊 Carregados {len(df):,} registros")
+                
+                # Se ainda está limitado a 1000, usa paginação manual
+                if len(df) == 1000:
+                    st.sidebar.warning("⚠️ Possível limitação de dados detectada. Usando paginação...")
+                    return _self.load_data_with_pagination()
+                
+                # Converte colunas de data
+                date_columns = [
+                    'abertura', 'parada', 'funcionamento', 'fechamento',
+                    'data_atendimento', 'data_solucao', 'data_chamado',
+                    'data_inicial_mo', 'data_fim_mo', 'inicio_pendencia', 'fechamento_pendencia'
+                ]
+                
+                for col in date_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                # Adiciona coluna "Possui Chamado"
+                if 'data_chamado' in df.columns:
+                    df['possui_chamado'] = df['data_chamado'].apply(
+                        lambda x: 'Sim' if pd.notna(x) else 'Não'
+                    )
+                
+                return df
+            else:
+                return pd.DataFrame()
+                
+        except Exception as e:
+            st.error(f"Erro ao carregar os dados: {e}")
+            return pd.DataFrame()
+
+    def load_data_with_pagination(_self) -> pd.DataFrame:
+        """
+        Método de paginação usando order by id e filtros
+        """
+        try:
+            if not _self.supabase:
+                return pd.DataFrame()
+            
+            all_data = []
+            last_id = 0
+            batch_size = 1000
+            
+            st.sidebar.info("🔄 Carregando dados em lotes...")
+            
+            while True:
+                # Ordena por ID e pega o próximo lote
+                result = _self.supabase.table('maintenance_orders').select("*").gt('id', last_id).order('id').limit(batch_size).execute()
+                
+                if not result.data or len(result.data) == 0:
+                    break
+                
+                all_data.extend(result.data)
+                last_id = result.data[-1]['id']  # Assume que existe uma coluna 'id'
+                
+                st.sidebar.text(f"Carregados {len(all_data):,} registros...")
+                
+                if len(result.data) < batch_size:
+                    break
+            
+            if all_data:
+                df = pd.DataFrame(all_data)
+                
+                # Converte colunas de data
+                date_columns = [
+                    'abertura', 'parada', 'funcionamento', 'fechamento',
+                    'data_atendimento', 'data_solucao', 'data_chamado',
+                    'data_inicial_mo', 'data_fim_mo', 'inicio_pendencia', 'fechamento_pendencia'
+                ]
+                
+                for col in date_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                # Adiciona coluna "Possui Chamado"
+                if 'data_chamado' in df.columns:
+                    df['possui_chamado'] = df['data_chamado'].apply(
+                        lambda x: 'Sim' if pd.notna(x) else 'Não'
+                    )
+                
+                return df
+            else:
+                return pd.DataFrame()
+                
+        except Exception as e:
+            st.error(f"Erro na paginação: {e}")
             return pd.DataFrame()
 
     def create_filters(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -620,13 +767,56 @@ def main():
         st.cache_data.clear()
         st.rerun()
     
-    # Carrega os dados
+    # Opção para escolher método de carregamento
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔧 Opções de Carregamento")
+    
+    load_method = st.sidebar.radio(
+        "Escolha o método de carregamento:",
+        ["Automático (Recomendado)", "Paginação Manual", "Limite Alto"],
+        help="""
+        - Automático: Usa paginação inteligente
+        - Paginação Manual: Carrega por ID sequencial
+        - Limite Alto: Tenta carregar tudo de uma vez
+        """
+    )
+    
+    # Carrega os dados baseado no método escolhido
     with st.spinner("Carregando dados do Supabase..."):
-        original_df = dashboard.load_data()
+        if load_method == "Automático (Recomendado)":
+            original_df = dashboard.load_data()
+        elif load_method == "Paginação Manual":
+            original_df = dashboard.load_data_with_pagination()
+        else:  # Limite Alto
+            original_df = dashboard.load_data_alternative()
     
     if original_df.empty:
         st.error("Nenhum dado disponível. Por favor, verifique sua conexão com o Supabase e garanta que os dados foram carregados.")
         st.info("Certifique-se de executar o script de extração de dados primeiro para popular seu banco de dados.")
+        
+        # Informações de debug
+        with st.expander("🔍 Informações de Debug"):
+            st.write("**Possíveis soluções:**")
+            st.write("1. Verifique se o arquivo `.streamlit/secrets.toml` está configurado corretamente")
+            st.write("2. Confirme se a tabela 'maintenance_orders' existe no Supabase")
+            st.write("3. Verifique as permissões de acesso à tabela")
+            st.write("4. Tente diferentes métodos de carregamento na barra lateral")
+            
+            if dashboard.supabase:
+                st.success("✅ Conexão com Supabase estabelecida")
+                
+                # Testa conexão básica
+                try:
+                    test_result = dashboard.supabase.table('maintenance_orders').select("count", count="exact").limit(1).execute()
+                    if hasattr(test_result, 'count'):
+                        st.info(f"📊 Total de registros detectados: {test_result.count}")
+                    else:
+                        st.warning("⚠️ Não foi possível contar os registros")
+                except Exception as e:
+                    st.error(f"❌ Erro ao acessar a tabela: {e}")
+            else:
+                st.error("❌ Falha na conexão com Supabase")
+        
         return
     
     # Aplica os filtros
@@ -644,6 +834,25 @@ def main():
         date_range = f"{filtered_df['abertura'].min().strftime('%Y-%m-%d')} a {filtered_df['abertura'].max().strftime('%Y-%m-%d')}"
         st.sidebar.info(f"📅 **Período:** {date_range}")
     
+    # Informações adicionais sobre os dados
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📈 Estatísticas dos Dados")
+    
+    if not filtered_df.empty:
+        # Estatísticas básicas
+        if 'situacao' in filtered_df.columns:
+            status_counts = filtered_df['situacao'].value_counts()
+            st.sidebar.write("**Status mais comum:**")
+            st.sidebar.write(f"- {status_counts.index[0]}: {status_counts.iloc[0]:,} registros")
+        
+        if 'equipamento' in filtered_df.columns:
+            eq_count = filtered_df['equipamento'].nunique()
+            st.sidebar.write(f"**Equipamentos únicos:** {eq_count:,}")
+        
+        if 'empresa' in filtered_df.columns:
+            emp_count = filtered_df['empresa'].nunique()
+            st.sidebar.write(f"**Empresas únicas:** {emp_count:,}")
+    
     # Exibe métricas de KPI
     st.header("📊 Indicadores Chave de Performance (KPIs)")
     dashboard.create_kpi_metrics(filtered_df)
@@ -656,6 +865,21 @@ def main():
     
     # Exibe análise de confiabilidade
     dashboard.create_mtbf_mttr_analysis(filtered_df)
+    
+    # Seção de dados brutos (opcional)
+    st.markdown("---")
+    if st.expander("📋 Ver Dados Brutos"):
+        st.subheader("Dados Filtrados")
+        st.dataframe(filtered_df, use_container_width=True)
+        
+        # Botão de download
+        csv = filtered_df.to_csv(index=False)
+        st.download_button(
+            label="📥 Baixar Dados Filtrados (CSV)",
+            data=csv,
+            file_name=f'maintenance_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+            mime='text/csv'
+        )
 
 
 if __name__ == "__main__":
