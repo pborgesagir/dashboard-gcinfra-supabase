@@ -6,7 +6,7 @@ on:
   workflow_dispatch: # Permite acionar o workflow manualmente no GitHub
   schedule:
     # Executa todo dia à meia-noite (00:00 UTC)
-    - cron: "0 0 * * *"
+    - cron: "0 15 * * *"
 
 jobs:
   update-data:
