@@ -1,0 +1,7 @@
+# requirements.txt
+
+requests
+pandas
+python-dotenv
+supabase
+numpy

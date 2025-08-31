@@ -1,0 +1,662 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from datetime import datetime, timedelta
+from supabase import create_client, Client
+import logging
+
+# Configuração da página
+st.set_page_config(
+    page_title="Dashboard - Engenharia Clínica - GCINFRA",
+    page_icon="🔧",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# CSS Personalizado Aprimorado
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #ff6b6b;
+    }
+    .kpi-title {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    .kpi-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+    }
+    .filter-section {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
+    }
+    .filter-title {
+        color: #495057;
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+    }
+    .filter-title:before {
+        content: "🔍";
+        margin-right: 8px;
+    }
+    .stSelectbox > div > div > div > div {
+        background-color: white;
+    }
+    .stMultiSelect > div > div > div > div {
+        background-color: white;
+    }
+    .sidebar-section {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid #007bff;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+class MaintenanceDashboard:
+    def __init__(self):
+        # Configuração do Supabase
+        try:
+            self.SUPABASE_URL = st.secrets["SUPABASE_URL"]
+            self.SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+            self.supabase: Client = create_client(self.SUPABASE_URL, self.SUPABASE_KEY)
+        except Exception as e:
+            st.error(f"Falha ao conectar ao Supabase. Verifique seu arquivo .streamlit/secrets.toml. Erro: {e}")
+            self.supabase = None
+
+    @st.cache_data(ttl=300)  # Cache por 5 minutos
+    def load_data(_self) -> pd.DataFrame:
+        """
+        Carrega os dados do Supabase
+        """
+        try:
+            if not _self.supabase:
+                return pd.DataFrame()
+            
+            # Busca os dados do Supabase
+            result = _self.supabase.table('maintenance_orders').select("*").execute()
+            
+            if result.data:
+                df = pd.DataFrame(result.data)
+                
+                # Converte colunas de data
+                date_columns = [
+                    'abertura', 'parada', 'funcionamento', 'fechamento',
+                    'data_atendimento', 'data_solucao', 'data_chamado',
+                    'data_inicial_mo', 'data_fim_mo', 'inicio_pendencia', 'fechamento_pendencia'
+                ]
+                
+                for col in date_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                # Adiciona coluna "Possui Chamado" baseada na data_chamado
+                if 'data_chamado' in df.columns:
+                    df['possui_chamado'] = df['data_chamado'].apply(
+                        lambda x: 'Sim' if pd.notna(x) else 'Não'
+                    )
+                
+                return df
+            else:
+                return pd.DataFrame()
+                
+        except Exception as e:
+            st.error(f"Erro ao carregar os dados: {e}")
+            return pd.DataFrame()
+
+    def create_filters(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Cria todos os filtros na sidebar com design aprimorado
+        """
+        st.sidebar.markdown("""
+        <div class="filter-title">Filtros do Dashboard</div>
+        """, unsafe_allow_html=True)
+        
+        filtered_df = df.copy()
+        
+        # Container para organizar melhor os filtros
+        with st.sidebar.container():
+            # Filtro de Data
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**📅 Período**")
+            if 'abertura' in df.columns and df['abertura'].notna().any():
+                min_date = df['abertura'].min().date()
+                max_date = df['abertura'].max().date()
+                
+                start_date, end_date = st.date_input(
+                    "Selecione o período",
+                    value=(min_date, max_date),
+                    min_value=min_date,
+                    max_value=max_date,
+                    key="date_filter"
+                )
+                
+                if len([start_date, end_date]) == 2:
+                    mask = (filtered_df['abertura'].dt.date >= start_date) & (filtered_df['abertura'].dt.date <= end_date)
+                    filtered_df = filtered_df[mask]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Empresa
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**🏢 Empresa**")
+            if 'empresa' in df.columns:
+                empresa_options = ['Todas'] + sorted([emp for emp in df['empresa'].unique() if pd.notna(emp) and emp != ''])
+                selected_empresa = st.selectbox(
+                    "Filtrar por empresa",
+                    empresa_options,
+                    key="empresa_filter"
+                )
+                
+                if selected_empresa != 'Todas':
+                    filtered_df = filtered_df[filtered_df['empresa'] == selected_empresa]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Equipamento
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**⚙️ Equipamento**")
+            if 'equipamento' in filtered_df.columns:
+                equipment_options = ['Todos'] + sorted([eq for eq in filtered_df['equipamento'].unique() if pd.notna(eq) and eq != ''])
+                selected_equipment = st.selectbox(
+                    "Filtrar por equipamento",
+                    equipment_options,
+                    key="equipment_filter"
+                )
+                
+                if selected_equipment != 'Todos':
+                    filtered_df = filtered_df[filtered_df['equipamento'] == selected_equipment]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Prioridade
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**🚨 Prioridade**")
+            if 'prioridade' in df.columns:
+                prioridade_options = ['Todas'] + sorted([p for p in df['prioridade'].unique() if pd.notna(p) and p != ''])
+                selected_prioridades = st.multiselect(
+                    "Filtrar por prioridade",
+                    prioridade_options,
+                    default=['Todas'],
+                    key="prioridade_filter"
+                )
+                
+                if 'Todas' not in selected_prioridades:
+                    filtered_df = filtered_df[filtered_df['prioridade'].isin(selected_prioridades)]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Setor
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**🏗️ Setor**")
+            if 'setor' in df.columns:
+                setor_options = ['Todos'] + sorted([s for s in df['setor'].unique() if pd.notna(s) and s != ''])
+                selected_setores = st.multiselect(
+                    "Filtrar por setor",
+                    setor_options,
+                    default=['Todos'],
+                    key="setor_filter"
+                )
+                
+                if 'Todos' not in selected_setores:
+                    filtered_df = filtered_df[filtered_df['setor'].isin(selected_setores)]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Tipo de Manutenção
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**🔧 Tipo de Manutenção**")
+            if 'tipomanutencao' in df.columns:
+                tipo_options = ['Todos'] + sorted([t for t in df['tipomanutencao'].unique() if pd.notna(t) and t != ''])
+                selected_tipos = st.multiselect(
+                    "Filtrar por tipo de manutenção",
+                    tipo_options,
+                    default=['Todos'],
+                    key="tipo_filter"
+                )
+                
+                if 'Todos' not in selected_tipos:
+                    filtered_df = filtered_df[filtered_df['tipomanutencao'].isin(selected_tipos)]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Possui Chamado
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**📞 Possui Chamado**")
+            if 'possui_chamado' in filtered_df.columns:
+                chamado_options = ['Todos', 'Sim', 'Não']
+                selected_chamado = st.selectbox(
+                    "Filtrar por presença de chamado",
+                    chamado_options,
+                    key="chamado_filter"
+                )
+                
+                if selected_chamado != 'Todos':
+                    filtered_df = filtered_df[filtered_df['possui_chamado'] == selected_chamado]
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Filtro de Status
+            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+            st.markdown("**📋 Status**")
+            if 'situacao' in df.columns:
+                status_options = ['Todos'] + sorted([status for status in df['situacao'].unique() if pd.notna(status) and status != ''])
+                selected_status = st.multiselect(
+                    "Filtrar por status",
+                    status_options,
+                    default=['Todos'],
+                    key="status_filter"
+                )
+                
+                if 'Todos' not in selected_status:
+                    filtered_df = filtered_df[filtered_df['situacao'].isin(selected_status)]
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        return filtered_df
+
+    def show_filter_summary(self, original_df: pd.DataFrame, filtered_df: pd.DataFrame):
+        """
+        Mostra um resumo dos filtros aplicados
+        """
+        if len(filtered_df) != len(original_df):
+            st.markdown(f"""
+            <div style="background-color: #e3f2fd; padding: 1rem; border-radius: 8px; border-left: 4px solid #2196f3; margin: 1rem 0;">
+                <strong>📊 Filtros Aplicados:</strong><br>
+                Mostrando <strong>{len(filtered_df):,}</strong> registros de <strong>{len(original_df):,}</strong> totais
+                ({(len(filtered_df)/len(original_df)*100):.1f}% dos dados)
+            </div>
+            """, unsafe_allow_html=True)
+
+    def calculate_mtbf(self, df: pd.DataFrame, equipment_col: str = 'equipamento') -> pd.DataFrame:
+        """
+        Calcula o Tempo Médio Entre Falhas (MTBF) para cada equipamento
+        """
+        if df.empty:
+            return pd.DataFrame()
+        
+        # Filtra por ordens de manutenção concluídas
+        completed_orders = df[df['fechamento'].notna()].copy()
+        
+        if completed_orders.empty:
+            return pd.DataFrame()
+        
+        # Agrupa por equipamento e calcula o MTBF
+        mtbf_data = []
+        
+        for equipment in completed_orders[equipment_col].unique():
+            if pd.isna(equipment) or equipment == '':
+                continue
+                
+            eq_orders = completed_orders[completed_orders[equipment_col] == equipment].copy()
+            eq_orders = eq_orders.sort_values('abertura')
+            
+            if len(eq_orders) < 2:
+                continue
+            
+            # Calcula o tempo entre as falhas
+            time_diffs = eq_orders['abertura'].diff().dt.total_seconds() / 3600  # Converte para horas
+            mean_tbf = time_diffs.mean()
+            
+            if not pd.isna(mean_tbf):
+                mtbf_data.append({
+                    'equipamento': equipment,
+                    'mtbf_hours': mean_tbf,
+                    'failure_count': len(eq_orders),
+                    'mtbf_days': mean_tbf / 24
+                })
+        
+        return pd.DataFrame(mtbf_data)
+
+    def calculate_mttr(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calcula o Tempo Médio Para Reparo (MTTR) para cada equipamento
+        """
+        if df.empty:
+            return pd.DataFrame()
+        
+        # Filtra ordens com data de abertura e fechamento
+        completed_orders = df[
+            (df['abertura'].notna()) & 
+            (df['fechamento'].notna())
+        ].copy()
+        
+        if completed_orders.empty:
+            return pd.DataFrame()
+        
+        # Calcula o tempo de reparo
+        completed_orders['repair_time_hours'] = (
+            completed_orders['fechamento'] - completed_orders['abertura']
+        ).dt.total_seconds() / 3600
+        
+        # Agrupa por equipamento e calcula o MTTR
+        mttr_data = completed_orders.groupby('equipamento').agg({
+            'repair_time_hours': ['mean', 'count', 'std'],
+            'os': 'count'
+        }).round(2)
+        
+        mttr_data.columns = ['mttr_hours', 'repair_count', 'mttr_std', 'total_orders']
+        mttr_data['mttr_days'] = (mttr_data['mttr_hours'] / 24).round(2)
+        
+        return mttr_data.reset_index()
+
+    def calculate_availability(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calcula a disponibilidade do equipamento
+        """
+        if df.empty:
+            return pd.DataFrame()
+        
+        # Filtra ordens concluídas
+        completed_orders = df[
+            (df['abertura'].notna()) & 
+            (df['fechamento'].notna())
+        ].copy()
+        
+        if completed_orders.empty:
+            return pd.DataFrame()
+        
+        # Calcula o tempo de inatividade
+        completed_orders['downtime_hours'] = (
+            completed_orders['fechamento'] - completed_orders['abertura']
+        ).dt.total_seconds() / 3600
+        
+        # Agrupa por equipamento
+        availability_data = []
+        
+        for equipment in completed_orders['equipamento'].unique():
+            if pd.isna(equipment) or equipment == '':
+                continue
+                
+            eq_orders = completed_orders[completed_orders['equipamento'] == equipment]
+            
+            # Calcula o tempo total de inatividade
+            total_downtime = eq_orders['downtime_hours'].sum()
+            
+            # Assume operação 24/7 para o cálculo da disponibilidade
+            # Você pode ajustar isso com base nas horas de operação reais
+            date_range = (eq_orders['fechamento'].max() - eq_orders['abertura'].min()).total_seconds() / 3600
+            
+            if date_range > 0:
+                availability_pct = max(0, (date_range - total_downtime) / date_range * 100)
+                
+                availability_data.append({
+                    'equipamento': equipment,
+                    'total_downtime_hours': total_downtime,
+                    'availability_pct': availability_pct,
+                    'failure_count': len(eq_orders)
+                })
+        
+        return pd.DataFrame(availability_data)
+
+    def create_kpi_metrics(self, df: pd.DataFrame):
+        """
+        Cria e exibe as métricas de KPI
+        """
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_os = len(df)
+            st.metric("Total de Ordens de Serviço", f"{total_os:,}")
+        
+        with col2:
+            open_os = len(df[df['situacao'].isin(['Aberto', 'Em Andamento', 'Pendente'])])
+            st.metric("Ordens em Aberto", f"{open_os:,}")
+        
+        with col3:
+            if not df.empty:
+                avg_resolution_time = df[
+                    (df['abertura'].notna()) & (df['fechamento'].notna())
+                ]['fechamento'].subtract(df['abertura']).dt.total_seconds() / 3600
+                avg_hours = avg_resolution_time.mean()
+                if not pd.isna(avg_hours):
+                    st.metric("Tempo Médio de Resolução", f"{avg_hours:.1f}h")
+                else:
+                    st.metric("Tempo Médio de Resolução", "N/D")
+            else:
+                st.metric("Tempo Médio de Resolução", "N/D")
+        
+        with col4:
+            total_cost = df[['custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno']].sum().sum()
+            st.metric("Custo Total de Manutenção", f"R$ {total_cost:,.2f}")
+
+    def create_charts(self, df: pd.DataFrame):
+        """
+        Cria vários gráficos para o dashboard
+        """
+        if df.empty:
+            st.warning("Não há dados disponíveis para os gráficos")
+            return
+        
+        # Linha 1: Série temporal e distribuição de status
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Ordens de Serviço ao Longo do Tempo")
+            if 'abertura' in df.columns and df['abertura'].notna().any():
+                df_time = df[df['abertura'].notna()].copy()
+                df_time['month'] = df_time['abertura'].dt.to_period('M')
+                monthly_orders = df_time.groupby('month').size().reset_index(name='count')
+                monthly_orders['month'] = monthly_orders['month'].astype(str)
+                
+                fig = px.line(monthly_orders, x='month', y='count', 
+                              title="Tendência Mensal de Ordens de Serviço")
+                fig.update_layout(xaxis_tickangle=45)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Não há dados de data disponíveis")
+        
+        with col2:
+            st.subheader("Distribuição de Status das Ordens de Serviço")
+            if 'situacao' in df.columns:
+                status_counts = df['situacao'].value_counts()
+                fig = px.pie(values=status_counts.values, names=status_counts.index,
+                             title="Distribuição de Status")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Não há dados de status disponíveis")
+        
+        # Linha 2: Análise de equipamentos
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Principais Equipamentos por Contagem de Falhas")
+            if 'equipamento' in df.columns:
+                equipment_counts = df['equipamento'].value_counts().head(10)
+                fig = px.bar(x=equipment_counts.values, y=equipment_counts.index,
+                             orientation='h', title="Equipamentos Mais Problemáticos")
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Não há dados de equipamento disponíveis")
+        
+        with col2:
+            st.subheader("Distribuição por Tipo de Manutenção")
+            if 'tipomanutencao' in df.columns:
+                maintenance_counts = df['tipomanutencao'].value_counts()
+                fig = px.bar(x=maintenance_counts.index, y=maintenance_counts.values,
+                             title="Tipos de Manutenção")
+                fig.update_layout(xaxis_tickangle=45)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Não há dados de tipo de manutenção disponíveis")
+        
+        # Linha 3: Análise de custos
+        st.subheader("Análise de Custos")
+        cost_cols = ['custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno']
+        available_cost_cols = [col for col in cost_cols if col in df.columns]
+        
+        if available_cost_cols:
+            cost_data = df[available_cost_cols].sum()
+            fig = px.bar(x=cost_data.index, y=cost_data.values,
+                         title="Custos Totais por Categoria")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Não há dados de custo disponíveis")
+
+    def create_mtbf_mttr_analysis(self, df: pd.DataFrame):
+        """
+        Cria a seção de análise de MTBF e MTTR
+        """
+        st.header("🔧 Análise de Confiabilidade (MTBF & MTTR)")
+        
+        if df.empty:
+            st.warning("Não há dados disponíveis para a análise de confiabilidade")
+            return
+        
+        # Calcula MTBF e MTTR
+        with st.spinner("Calculando métricas de confiabilidade..."):
+            mtbf_df = self.calculate_mtbf(df)
+            mttr_df = self.calculate_mttr(df)
+            availability_df = self.calculate_availability(df)
+        
+        # Cria abas para diferentes análises
+        tab1, tab2, tab3 = st.tabs(["Análise de MTBF", "Análise de MTTR", "Análise de Disponibilidade"])
+        
+        with tab1:
+            st.subheader("Tempo Médio Entre Falhas (MTBF)")
+            if not mtbf_df.empty:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Top 10 equipamentos por MTBF
+                    top_mtbf = mtbf_df.nlargest(10, 'mtbf_days')
+                    fig = px.bar(top_mtbf, x='mtbf_days', y='equipamento',
+                                 orientation='h', title="Top 10 Equipamentos por MTBF (Dias)")
+                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Piores 10 equipamentos por MTBF (mais problemáticos)
+                    bottom_mtbf = mtbf_df.nsmallest(10, 'mtbf_days')
+                    fig = px.bar(bottom_mtbf, x='mtbf_days', y='equipamento',
+                                 orientation='h', title="Piores 10 Equipamentos por MTBF (Dias)",
+                                 color_discrete_sequence=['red'])
+                    fig.update_layout(yaxis={'categoryorder': 'total descending'})
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Tabela de resumo do MTBF
+                st.subheader("Resumo do MTBF")
+                st.dataframe(mtbf_df.round(2), use_container_width=True)
+            else:
+                st.info("Dados insuficientes para o cálculo do MTBF")
+        
+        with tab2:
+            st.subheader("Tempo Médio Para Reparo (MTTR)")
+            if not mttr_df.empty:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Melhor MTTR (reparos mais rápidos)
+                    best_mttr = mttr_df.nsmallest(10, 'mttr_hours')
+                    fig = px.bar(best_mttr, x='mttr_hours', y='equipamento',
+                                 orientation='h', title="Reparos Mais Rápidos (MTTR em Horas)",
+                                 color_discrete_sequence=['green'])
+                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Pior MTTR (reparos mais lentos)
+                    worst_mttr = mttr_df.nlargest(10, 'mttr_hours')
+                    fig = px.bar(worst_mttr, x='mttr_hours', y='equipamento',
+                                 orientation='h', title="Reparos Mais Lentos (MTTR em Horas)",
+                                 color_discrete_sequence=['red'])
+                    fig.update_layout(yaxis={'categoryorder': 'total descending'})
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Tabela de resumo do MTTR
+                st.subheader("Resumo do MTTR")
+                st.dataframe(mttr_df.round(2), use_container_width=True)
+            else:
+                st.info("Dados insuficientes para o cálculo do MTTR")
+        
+        with tab3:
+            st.subheader("Disponibilidade dos Equipamentos")
+            if not availability_df.empty:
+                # Gráfico de disponibilidade
+                fig = px.bar(availability_df.nlargest(15, 'availability_pct'), 
+                             x='equipamento', y='availability_pct',
+                             title="Disponibilidade dos Equipamentos (%)")
+                fig.update_layout(xaxis_tickangle=45)
+                fig.add_hline(y=90, line_dash="dash", line_color="green", 
+                              annotation_text="Meta de 90%")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Resumo da disponibilidade
+                avg_availability = availability_df['availability_pct'].mean()
+                st.metric("Disponibilidade Média dos Equipamentos", f"{avg_availability:.1f}%")
+                
+                # Tabela de disponibilidade
+                st.subheader("Resumo da Disponibilidade")
+                st.dataframe(availability_df.round(2), use_container_width=True)
+            else:
+                st.info("Dados insuficientes para o cálculo da disponibilidade")
+
+
+def main():
+    """
+    Função principal para rodar o dashboard
+    """
+    st.title("🔧 Dashboard Engenharia Clínica - GCINFRA")
+    st.markdown("---")
+    
+    # Inicializa o dashboard
+    dashboard = MaintenanceDashboard()
+    
+    # Controles da barra lateral
+    st.sidebar.header("⚙️ Controles do Dashboard")
+    
+    # Botão de atualização de dados
+    if st.sidebar.button("🔄 Atualizar Dados", help="Clique para recarregar os dados do banco"):
+        st.cache_data.clear()
+        st.rerun()
+    
+    # Carrega os dados
+    with st.spinner("Carregando dados do Supabase..."):
+        original_df = dashboard.load_data()
+    
+    if original_df.empty:
+        st.error("Nenhum dado disponível. Por favor, verifique sua conexão com o Supabase e garanta que os dados foram carregados.")
+        st.info("Certifique-se de executar o script de extração de dados primeiro para popular seu banco de dados.")
+        return
+    
+    # Aplica os filtros
+    filtered_df = dashboard.create_filters(original_df)
+    
+    # Mostra resumo dos filtros aplicados
+    dashboard.show_filter_summary(original_df, filtered_df)
+    
+    # Informações dos dados na sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.info(f"📊 **Dados carregados:** {len(original_df):,} registros")
+    st.sidebar.success(f"📋 **Dados filtrados:** {len(filtered_df):,} registros")
+    
+    if 'abertura' in filtered_df.columns and filtered_df['abertura'].notna().any():
+        date_range = f"{filtered_df['abertura'].min().strftime('%Y-%m-%d')} a {filtered_df['abertura'].max().strftime('%Y-%m-%d')}"
+        st.sidebar.info(f"📅 **Período:** {date_range}")
+    
+    # Exibe métricas de KPI
+    st.header("📊 Indicadores Chave de Performance (KPIs)")
+    dashboard.create_kpi_metrics(filtered_df)
+    st.markdown("---")
+    
+    # Exibe gráficos principais
+    st.header("📈 Gráficos de Análise")
+    dashboard.create_charts(filtered_df)
+    st.markdown("---")
+    
+    # Exibe análise de confiabilidade
+    dashboard.create_mtbf_mttr_analysis(filtered_df)
+
+
+if __name__ == "__main__":
+    main()
