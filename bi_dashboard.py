@@ -782,7 +782,7 @@ def main():
     )
     
     # Carrega os dados baseado no método escolhido
-    with st.spinner("Carregando dados do Supabase..."):
+    with st.spinner("Carregando dados..."):
         if load_method == "Automático (Recomendado)":
             original_df = dashboard.load_data()
         elif load_method == "Paginação Manual":
