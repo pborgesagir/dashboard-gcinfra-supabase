@@ -487,18 +487,21 @@ class MaintenanceDashboard:
         # Reorganiza as linhas para mostrar na ordem correta (segunda a domingo)
         pivot_df = pivot_df.reindex(all_weekdays)
         
-        # Cria o heatmap usando plotly
+        # Cria o heatmap usando plotly com escala de azul e valores visíveis
         fig = go.Figure(data=go.Heatmap(
             z=pivot_df.values,
             x=[f"{h:02d}:00" for h in pivot_df.columns],
             y=pivot_df.index,
-            colorscale='RdYlBu_r',
+            colorscale='Blues',
             showscale=True,
             hoverongaps=False,
             hovertemplate='<b>%{y}</b><br>' +
                          'Horário: %{x}<br>' +
                          'Ordens Abertas: %{z}<br>' +
-                         '<extra></extra>'
+                         '<extra></extra>',
+            text=pivot_df.values,
+            texttemplate="%{text}",
+            textfont={"size": 10}
         ))
         
         fig.update_layout(
