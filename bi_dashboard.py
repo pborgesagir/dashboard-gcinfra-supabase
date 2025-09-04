@@ -424,6 +424,183 @@ class MaintenanceDashboard:
             </div>
             """, unsafe_allow_html=True)
 
+    def create_opening_heatmap(self, df: pd.DataFrame):
+        """
+        Cria um heatmap mostrando os dias da semana e horários de abertura das OS
+        """
+        st.subheader("🕐 Heatmap de Abertura de Ordens de Serviço")
+        
+        if df.empty or 'abertura' not in df.columns or df['abertura'].isna().all():
+            st.warning("Não há dados de abertura disponíveis para o heatmap")
+            return
+        
+        # Filtra apenas registros com data de abertura válida
+        df_with_opening = df[df['abertura'].notna()].copy()
+        
+        if df_with_opening.empty:
+            st.warning("Não há registros com data de abertura válida")
+            return
+        
+        # Extrai informações de data e hora
+        df_with_opening['weekday'] = df_with_opening['abertura'].dt.dayofweek
+        df_with_opening['hour'] = df_with_opening['abertura'].dt.hour
+        
+        # Mapeia os dias da semana para português (0=Segunda, 6=Domingo)
+        weekday_map = {
+            0: 'Segunda-feira',
+            1: 'Terça-feira', 
+            2: 'Quarta-feira',
+            3: 'Quinta-feira',
+            4: 'Sexta-feira',
+            5: 'Sábado',
+            6: 'Domingo'
+        }
+        
+        df_with_opening['weekday_pt'] = df_with_opening['weekday'].map(weekday_map)
+        
+        # Cria uma tabela pivot para o heatmap
+        heatmap_data = df_with_opening.groupby(['weekday_pt', 'hour']).size().reset_index(name='count')
+        
+        # Cria uma matriz completa com todos os dias da semana e todas as horas
+        all_weekdays = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+        all_hours = list(range(24))
+        
+        # Cria um DataFrame completo com todas as combinações
+        full_matrix = []
+        for weekday in all_weekdays:
+            for hour in all_hours:
+                count = heatmap_data[
+                    (heatmap_data['weekday_pt'] == weekday) & 
+                    (heatmap_data['hour'] == hour)
+                ]['count'].sum()
+                full_matrix.append({
+                    'weekday_pt': weekday,
+                    'hour': hour,
+                    'count': count
+                })
+        
+        full_df = pd.DataFrame(full_matrix)
+        
+        # Transforma em matriz pivot
+        pivot_df = full_df.pivot(index='weekday_pt', columns='hour', values='count').fillna(0)
+        
+        # Reorganiza as linhas para mostrar na ordem correta (segunda a domingo)
+        pivot_df = pivot_df.reindex(all_weekdays)
+        
+        # Cria o heatmap usando plotly
+        fig = go.Figure(data=go.Heatmap(
+            z=pivot_df.values,
+            x=[f"{h:02d}:00" for h in pivot_df.columns],
+            y=pivot_df.index,
+            colorscale='RdYlBu_r',
+            showscale=True,
+            hoverongaps=False,
+            hovertemplate='<b>%{y}</b><br>' +
+                         'Horário: %{x}<br>' +
+                         'Ordens Abertas: %{z}<br>' +
+                         '<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            title={
+                'text': 'Padrão de Abertura de Ordens de Serviço por Dia da Semana e Horário',
+                'x': 0.5,
+                'xanchor': 'center'
+            },
+            xaxis_title="Horário do Dia",
+            yaxis_title="Dia da Semana",
+            width=None,
+            height=500,
+            xaxis={
+                'tickmode': 'array',
+                'tickvals': list(range(0, 24, 2)),
+                'ticktext': [f"{h:02d}:00" for h in range(0, 24, 2)]
+            }
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Adiciona estatísticas complementares
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Estatísticas por Dia da Semana")
+            weekday_stats = df_with_opening.groupby('weekday_pt').size().sort_values(ascending=False)
+            
+            # Reorganiza para mostrar de segunda a domingo
+            weekday_stats = weekday_stats.reindex(all_weekdays).fillna(0).astype(int)
+            
+            fig_weekday = px.bar(
+                x=weekday_stats.index,
+                y=weekday_stats.values,
+                title="Ordens de Serviço por Dia da Semana",
+                labels={'x': 'Dia da Semana', 'y': 'Quantidade de Ordens'}
+            )
+            fig_weekday.update_layout(xaxis_tickangle=45)
+            st.plotly_chart(fig_weekday, use_container_width=True)
+        
+        with col2:
+            st.subheader("⏰ Estatísticas por Horário")
+            hour_stats = df_with_opening.groupby('hour').size().sort_values(ascending=False)
+            
+            fig_hour = px.bar(
+                x=[f"{h:02d}:00" for h in hour_stats.index],
+                y=hour_stats.values,
+                title="Ordens de Serviço por Horário do Dia",
+                labels={'x': 'Horário', 'y': 'Quantidade de Ordens'}
+            )
+            fig_hour.update_layout(xaxis_tickangle=45)
+            st.plotly_chart(fig_hour, use_container_width=True)
+        
+        # Insights automáticos
+        st.subheader("💡 Insights Automáticos")
+        
+        # Dia mais movimentado
+        busiest_day = weekday_stats.idxmax()
+        busiest_day_count = weekday_stats.max()
+        
+        # Horário mais movimentado
+        busiest_hour = hour_stats.idxmax()
+        busiest_hour_count = hour_stats.max()
+        
+        # Dia menos movimentado
+        quietest_day = weekday_stats.idxmin()
+        quietest_day_count = weekday_stats.min()
+        
+        # Horário menos movimentado (considerando horário comercial 6-22)
+        business_hours = hour_stats[hour_stats.index.isin(range(6, 23))]
+        quietest_business_hour = business_hours.idxmin() if not business_hours.empty else None
+        
+        insights = []
+        
+        insights.append(f"📈 **Dia mais movimentado:** {busiest_day} com {busiest_day_count} ordens abertas")
+        insights.append(f"📉 **Dia menos movimentado:** {quietest_day} com {quietest_day_count} ordens abertas")
+        insights.append(f"⏰ **Horário de pico:** {busiest_hour:02d}:00 com {busiest_hour_count} ordens abertas")
+        
+        if quietest_business_hour is not None:
+            quietest_business_hour_count = business_hours.min()
+            insights.append(f"🕐 **Horário comercial mais tranquilo:** {quietest_business_hour:02d}:00 com {quietest_business_hour_count} ordens abertas")
+        
+        # Percentual fim de semana vs dias úteis
+        weekend_count = weekday_stats[['Sábado', 'Domingo']].sum()
+        weekday_count = weekday_stats[['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira']].sum()
+        total_count = weekend_count + weekday_count
+        
+        if total_count > 0:
+            weekend_pct = (weekend_count / total_count) * 100
+            insights.append(f"📅 **Ordens em fins de semana:** {weekend_pct:.1f}% do total ({weekend_count} ordens)")
+        
+        # Horário comercial vs não comercial
+        business_hours_count = hour_stats[hour_stats.index.isin(range(6, 19))].sum()  # 6h às 18h
+        after_hours_count = hour_stats[~hour_stats.index.isin(range(6, 19))].sum()
+        
+        if total_count > 0:
+            business_pct = (business_hours_count / total_count) * 100
+            insights.append(f"🏢 **Ordens em horário comercial (6h-18h):** {business_pct:.1f}% do total ({business_hours_count} ordens)")
+        
+        for insight in insights:
+            st.write(insight)
+
     def calculate_mtbf(self, df: pd.DataFrame, equipment_col: str = 'equipamento') -> pd.DataFrame:
         """
         Calcula o Tempo Médio Entre Falhas (MTBF) para cada equipamento
@@ -649,6 +826,10 @@ class MaintenanceDashboard:
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Não há dados de custo disponíveis")
+        
+        # NOVO: Adiciona o heatmap de abertura das OS
+        st.markdown("---")
+        self.create_opening_heatmap(df)
 
     def create_mtbf_mttr_analysis(self, df: pd.DataFrame):
         """
@@ -858,7 +1039,7 @@ def main():
     dashboard.create_kpi_metrics(filtered_df)
     st.markdown("---")
     
-    # Exibe gráficos principais
+    # Exibe gráficos principais (que agora incluem o heatmap)
     st.header("📈 Gráficos de Análise")
     dashboard.create_charts(filtered_df)
     st.markdown("---")
