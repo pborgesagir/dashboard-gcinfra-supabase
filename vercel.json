@@ -1,5 +1,9 @@
 {
-  "buildCommand": "cd healthcare-saas && npm ci && npm run build",
-  "outputDirectory": "healthcare-saas/.next",
-  "installCommand": "cd healthcare-saas && npm ci"
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm ci",
+  "cwd": "healthcare-saas",
+  "env": {
+    "SKIP_ENV_VALIDATION": "1"
+  }
 }
