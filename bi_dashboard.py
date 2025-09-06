@@ -82,7 +82,7 @@ class MaintenanceDashboard:
             self.supabase = None
 
     @st.cache_data(ttl=300)  # Cache por 5 minutos
-    def load_data(_self) -> pd.DataFrame:
+    def load_clinical_data(_self) -> pd.DataFrame:
         """
         Carrega TODOS os dados do Supabase usando paginação
         """
@@ -266,6 +266,72 @@ class MaintenanceDashboard:
                 
         except Exception as e:
             st.error(f"Erro na paginação: {e}")
+            return pd.DataFrame()
+
+    @st.cache_data(ttl=300)  # Cache por 5 minutos
+    def load_building_data(_self) -> pd.DataFrame:
+        """
+        Carrega dados de engenharia predial do Supabase
+        """
+        try:
+            if not _self.supabase:
+                return pd.DataFrame()
+            
+            st.sidebar.info("📊 Carregando dados de Engenharia Predial...")
+            progress_bar = st.sidebar.progress(0)
+            status_text = st.sidebar.empty()
+            
+            all_data = []
+            page_size = 1000
+            offset = 0
+            
+            while True:
+                status_text.text(f"Carregando dados prediais... {len(all_data):,} registros")
+                
+                # Consulta com range para paginação
+                result = _self.supabase.table('building_orders').select("*").range(offset, offset + page_size - 1).execute()
+                
+                if not result.data:
+                    break
+                    
+                all_data.extend(result.data)
+                offset += page_size
+                
+                # Proteção contra loop infinito
+                if offset > 100000:
+                    st.warning("Limite de segurança atingido para dados prediais.")
+                    break
+            
+            progress_bar.empty()
+            status_text.empty()
+            
+            if all_data:
+                df = pd.DataFrame(all_data)
+                st.sidebar.success(f"✅ Carregados {len(df):,} registros prediais!")
+                
+                # Converte colunas de data
+                date_columns = [
+                    'abertura', 'parada', 'funcionamento', 'fechamento',
+                    'data_atendimento', 'data_solucao', 'data_chamado',
+                    'data_inicial_mo', 'data_fim_mo', 'inicio_pendencia', 'fechamento_pendencia'
+                ]
+                
+                for col in date_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                # Adiciona coluna "Possui Chamado"
+                if 'data_chamado' in df.columns:
+                    df['possui_chamado'] = df['data_chamado'].apply(
+                        lambda x: 'Sim' if pd.notna(x) else 'Não'
+                    )
+                
+                return df
+            else:
+                return pd.DataFrame()
+                
+        except Exception as e:
+            st.error(f"Erro ao carregar dados prediais: {e}")
             return pd.DataFrame()
 
     def create_filters(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -937,7 +1003,7 @@ def main():
     """
     Função principal para rodar o dashboard
     """
-    st.title("🔧 Dashboard Engenharia Clínica - GCINFRA")
+    st.title("🏥 Dashboard Engenharia - GCINFRA")
     st.markdown("---")
     
     # Inicializa o dashboard
@@ -946,33 +1012,51 @@ def main():
     # Controles da barra lateral
     st.sidebar.header("⚙️ Controles do Dashboard")
     
+    # Seleção do tipo de engenharia
+    st.sidebar.subheader("🏗️ Tipo de Engenharia")
+    engineering_type = st.sidebar.selectbox(
+        "Selecione o tipo:",
+        ["Engenharia Clínica", "Engenharia Predial"],
+        help="Escolha entre dados de Engenharia Clínica ou Engenharia Predial"
+    )
+    
     # Botão de atualização de dados
     if st.sidebar.button("🔄 Atualizar Dados", help="Clique para recarregar os dados do banco"):
         st.cache_data.clear()
         st.rerun()
     
-    # Opção para escolher método de carregamento
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔧 Opções de Carregamento")
+    # Atualiza o título baseado na seleção
+    if engineering_type == "Engenharia Clínica":
+        st.markdown("## 🔧 Engenharia Clínica")
+    else:
+        st.markdown("## 🏗️ Engenharia Predial")
     
-    load_method = st.sidebar.radio(
-        "Escolha o método de carregamento:",
-        ["Automático (Recomendado)", "Paginação Manual", "Limite Alto"],
-        help="""
-        - Automático: Usa paginação inteligente
-        - Paginação Manual: Carrega por ID sequencial
-        - Limite Alto: Tenta carregar tudo de uma vez
-        """
-    )
+    # Opção para escolher método de carregamento (apenas para engenharia clínica)
+    if engineering_type == "Engenharia Clínica":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🔧 Opções de Carregamento")
+        
+        load_method = st.sidebar.radio(
+            "Escolha o método de carregamento:",
+            ["Automático (Recomendado)", "Paginação Manual", "Limite Alto"],
+            help="""
+            - Automático: Usa paginação inteligente
+            - Paginação Manual: Carrega por ID sequencial
+            - Limite Alto: Tenta carregar tudo de uma vez
+            """
+        )
     
-    # Carrega os dados baseado no método escolhido
+    # Carrega os dados baseado no tipo selecionado
     with st.spinner("Carregando dados..."):
-        if load_method == "Automático (Recomendado)":
-            original_df = dashboard.load_data()
-        elif load_method == "Paginação Manual":
-            original_df = dashboard.load_data_with_pagination()
-        else:  # Limite Alto
-            original_df = dashboard.load_data_alternative()
+        if engineering_type == "Engenharia Clínica":
+            if load_method == "Automático (Recomendado)":
+                original_df = dashboard.load_clinical_data()
+            elif load_method == "Paginação Manual":
+                original_df = dashboard.load_data_with_pagination()
+            else:  # Limite Alto
+                original_df = dashboard.load_data_alternative()
+        else:  # Engenharia Predial
+            original_df = dashboard.load_building_data()
     
     if original_df.empty:
         st.error("Nenhum dado disponível. Por favor, verifique sua conexão com o Supabase e garanta que os dados foram carregados.")
@@ -982,16 +1066,19 @@ def main():
         with st.expander("🔍 Informações de Debug"):
             st.write("**Possíveis soluções:**")
             st.write("1. Verifique se o arquivo `.streamlit/secrets.toml` está configurado corretamente")
-            st.write("2. Confirme se a tabela 'maintenance_orders' existe no Supabase")
+            
+            table_name = 'maintenance_orders' if engineering_type == "Engenharia Clínica" else 'building_orders'
+            st.write(f"2. Confirme se a tabela '{table_name}' existe no Supabase")
             st.write("3. Verifique as permissões de acesso à tabela")
-            st.write("4. Tente diferentes métodos de carregamento na barra lateral")
+            if engineering_type == "Engenharia Clínica":
+                st.write("4. Tente diferentes métodos de carregamento na barra lateral")
             
             if dashboard.supabase:
                 st.success("✅ Conexão com Supabase estabelecida")
                 
                 # Testa conexão básica
                 try:
-                    test_result = dashboard.supabase.table('maintenance_orders').select("count", count="exact").limit(1).execute()
+                    test_result = dashboard.supabase.table(table_name).select("count", count="exact").limit(1).execute()
                     if hasattr(test_result, 'count'):
                         st.info(f"📊 Total de registros detectados: {test_result.count}")
                     else:
@@ -1068,3 +1155,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

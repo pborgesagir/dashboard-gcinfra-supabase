@@ -31,4 +31,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
           API_USER: ${{ secrets.API_USER }}
+          AGIR_API_TOKEN: ${{ secrets.AGIR_API_TOKEN }}
+          AGIR_API_USER: ${{ secrets.AGIR_API_USER }}
+          AGIR_API_EMAIL: ${{ secrets.AGIR_API_EMAIL }}
         run: python data_extraction.py

@@ -189,14 +189,198 @@ class MaintenanceDataExtractor:
             return False
 
 
+class BuildingEngineeringDataExtractor:
+    def __init__(self):
+        # AGIR API Configuration
+        self.AGIR_API_CONFIG = {
+            'token': os.getenv("AGIR_API_TOKEN", "2050ee77-2cc7-47e0-8b82-4c8dda75ef5f"),
+            'user': os.getenv("AGIR_API_USER", "kaio"),
+            'email': os.getenv("AGIR_API_EMAIL", "adm.infraestrutura@hugol.org.br"),
+            'base_url': "https://agir.api.neovero.com/api/queries/execute/consulta_os",
+            'api_key_header': "X-API-KEY"
+        }
+
+        # Supabase configuration (reuse existing)
+        self.SUPABASE_URL = os.getenv("SUPABASE_URL")
+        self.SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+        self.supabase: Client = create_client(self.SUPABASE_URL, self.SUPABASE_KEY)
+        
+        # Column mapping for building engineering data
+        self.building_columns = [
+            'empresa_id', 'empresa', 'razaosocial', 'grupo_setor', 'os', 'oficina', 'tipo', 
+            'prioridade', 'complexidade', 'tag', 'patrimonio', 'sn', 'equipamento', 'setor', 
+            'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento', 
+            'data_solucao', 'data_chamado', 'ocorrencia', 'causa', 'fornecedor', 'custo_os', 
+            'custo_mo', 'custo_peca', 'custo_servicoexterno', 'responsavel', 'solicitante',
+            'tipomanutencao', 'situacao', 'situacao_int', 'colaborador_mo', 'data_inicial_mo',
+            'data_fim_mo', 'qtd_mo_min', 'obs_mo', 'servico', 'requisicao', 'avaliacao',
+            'obs_requisicao', 'pendencia', 'inicio_pendencia', 'fechamento_pendencia'
+        ]
+
+    def get_all_empresa_ids(self) -> List[int]:
+        """Get all available empresa_id values. For now, using common IDs."""
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    def get_all_situacao_int(self) -> List[int]:
+        """Get all available situacao_int values."""
+        return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+
+    def fetch_building_data(self, start_date: datetime, end_date: datetime) -> List[Dict]:
+        """Fetch building engineering data from AGIR API."""
+        formatted_start = start_date.strftime("%Y-%m-%dT%H:%M")
+        all_data = []
+        
+        empresa_ids = self.get_all_empresa_ids()
+        situacao_ints = self.get_all_situacao_int()
+        
+        headers = {
+            'Content-Type': 'application/json',
+            self.AGIR_API_CONFIG['api_key_header']: self.AGIR_API_CONFIG['token']
+        }
+
+        for empresa_id in empresa_ids:
+            situacao_str = ','.join(map(str, situacao_ints))
+            url = f"{self.AGIR_API_CONFIG['base_url']}?data_abertura_inicio={formatted_start}&empresa_id={empresa_id}&situacao_int={situacao_str}"
+            
+            try:
+                logger.info(f"Fetching building data for empresa_id={empresa_id}...")
+                response = requests.get(url, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                
+                if data:
+                    logger.info(f"Fetched {len(data)} building records for empresa_id={empresa_id}")
+                    all_data.extend(data)
+                
+                time.sleep(0.2)  # Rate limiting
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Building API request failed for empresa_id={empresa_id}: {e}")
+                continue
+
+        logger.info(f"Total building records fetched: {len(all_data)}")
+        return all_data
+
+    def clean_and_transform_building_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and transform building engineering data."""
+        if df.empty:
+            return pd.DataFrame()
+
+        # Ensure all required columns exist
+        for col in self.building_columns:
+            if col not in df.columns:
+                df[col] = None
+
+        df = df[self.building_columns]
+
+        # Clean date columns
+        date_columns = [
+            'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento', 
+            'data_solucao', 'data_chamado', 'data_inicial_mo', 'data_fim_mo', 
+            'inicio_pendencia', 'fechamento_pendencia'
+        ]
+        
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+            df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) else None)
+
+        # Clean numeric columns
+        numeric_columns = ['empresa_id', 'situacao_int', 'custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno', 'qtd_mo_min']
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # Replace NaN values
+        df = df.replace({np.nan: None, 'nan': None, 'None': None, '': None})
+        
+        logger.info(f"Cleaned and transformed {len(df)} building records.")
+        return df
+
+    def insert_building_data_to_supabase(self, df: pd.DataFrame) -> bool:
+        """Insert building engineering data into Supabase."""
+        if df.empty:
+            logger.info("No building data to insert.")
+            return True
+
+        try:
+            records = df.to_dict('records')
+            batch_size = 100
+            total_inserted = 0
+
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                try:
+                    self.supabase.table('building_orders').upsert(batch, on_conflict='os').execute()
+                    total_inserted += len(batch)
+                    logger.info(f"Upserted building batch {i//batch_size + 1}, total: {total_inserted}/{len(records)}")
+                except Exception as batch_error:
+                    logger.error(f"Error upserting building batch {i//batch_size + 1}: {batch_error}")
+                
+                time.sleep(0.1)
+
+            logger.info(f"Successfully upserted {total_inserted} building records to Supabase.")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to insert building data to Supabase: {e}")
+            return False
+
+    def extract_and_store_building_data(self, days_back: int = 730) -> bool:
+        """Main method to extract and store building engineering data."""
+        try:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_back)
+            logger.info(f"Extracting building data from {start_date} to {end_date}")
+
+            raw_building_data = self.fetch_building_data(start_date, end_date)
+            if not raw_building_data:
+                logger.warning("No building data received from AGIR API.")
+                return False
+
+            building_df = pd.DataFrame(raw_building_data)
+            
+            # Remove duplicates based on 'os' column
+            initial_rows = len(building_df)
+            building_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
+            final_rows = len(building_df)
+            if initial_rows > final_rows:
+                logger.info(f"Removed {initial_rows - final_rows} duplicate building 'os' records.")
+
+            cleaned_df = self.clean_and_transform_building_data(building_df)
+            success = self.insert_building_data_to_supabase(cleaned_df)
+            return success
+            
+        except Exception as e:
+            logger.error(f"An error occurred in building data extraction: {e}", exc_info=True)
+            return False
+
+
 def main():
-    """Main function to run the data extraction."""
-    extractor = MaintenanceDataExtractor()
-    success = extractor.extract_and_store_data(days_back=730) 
-    if success:
-        print("✅ Data extraction and storage completed successfully!")
+    """Main function to run both data extractions."""
+    # Clinical Engineering Data Extraction
+    logger.info("Starting Clinical Engineering Data Extraction...")
+    clinical_extractor = MaintenanceDataExtractor()
+    clinical_success = clinical_extractor.extract_and_store_data(days_back=730)
+    
+    if clinical_success:
+        print("✅ Clinical engineering data extraction completed successfully!")
     else:
-        print("❌ Data extraction failed. Check logs for details.")
+        print("❌ Clinical engineering data extraction failed. Check logs.")
+    
+    # Building Engineering Data Extraction
+    logger.info("Starting Building Engineering Data Extraction...")
+    building_extractor = BuildingEngineeringDataExtractor()
+    building_success = building_extractor.extract_and_store_building_data(days_back=730)
+    
+    if building_success:
+        print("✅ Building engineering data extraction completed successfully!")
+    else:
+        print("❌ Building engineering data extraction failed. Check logs.")
+    
+    # Overall status
+    if clinical_success and building_success:
+        print("🎉 All data extractions completed successfully!")
+    else:
+        print("⚠️ Some data extractions failed. Check logs for details.")
 
 
 if __name__ == "__main__":
