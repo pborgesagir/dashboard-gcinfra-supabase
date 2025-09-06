@@ -1,7 +1,5 @@
 {
-  "functions": {
-    "app/api/*/route.ts": {
-      "maxDuration": 30
-    }
-  }
+  "buildCommand": "cd healthcare-saas && npm run build",
+  "outputDirectory": "healthcare-saas/.next",
+  "installCommand": "cd healthcare-saas && npm install"
 }
