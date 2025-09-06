@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd healthcare-saas && npm run build",
-  "outputDirectory": "healthcare-saas/.next",
-  "installCommand": "cd healthcare-saas && npm install"
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install"
 }
