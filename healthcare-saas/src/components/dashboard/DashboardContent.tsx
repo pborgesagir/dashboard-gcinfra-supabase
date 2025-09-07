@@ -47,6 +47,10 @@ import MaintenanceChart from './MaintenanceChart'
 import HeatmapChart from './HeatmapChart'
 import WorkOrderTrendChart from './WorkOrderTrendChart'
 import ResponseTimeTrendChart from './ResponseTimeTrendChart'
+import CausaChart from './CausaChart'
+import FamiliaChart from './FamiliaChart'
+import TipoManutencaoChart from './TipoManutencaoChart'
+import SetorChart from './SetorChart'
 
 interface MaintenanceOrder {
   id: number
@@ -60,6 +64,11 @@ interface MaintenanceOrder {
   setor: string | null
   tipomanutencao: string | null
   data_chamado: string | null
+  data_atendimento: string | null
+  responsavel: string | null
+  solicitante: string | null
+  causa: string | null
+  familia: string | null
   custo_os: number | null
   custo_mo: number | null
   custo_peca: number | null
@@ -68,8 +77,10 @@ interface MaintenanceOrder {
 }
 
 interface FilterState {
-  startDate: Date | null
-  endDate: Date | null
+  aberturaStartDate: Date | null
+  aberturaEndDate: Date | null
+  fechamentoStartDate: Date | null
+  fechamentoEndDate: Date | null
   empresa: string
   equipamento: string
   prioridade: string[]
@@ -88,8 +99,10 @@ export default function DashboardContent() {
   const [error, setError] = useState<string | null>(null)
   const [dataType, setDataType] = useState<'clinical' | 'building'>('clinical')
   const [filters, setFilters] = useState<FilterState>({
-    startDate: null,
-    endDate: null,
+    aberturaStartDate: null,
+    aberturaEndDate: null,
+    fechamentoStartDate: null,
+    fechamentoEndDate: null,
     empresa: 'Todos',
     equipamento: 'Todos',
     prioridade: [],
@@ -184,13 +197,27 @@ export default function DashboardContent() {
     let filtered = [...data]
 
     // Date range filter
-    if (filters.startDate || filters.endDate) {
+    // Filter by abertura date range
+    if (filters.aberturaStartDate || filters.aberturaEndDate) {
       filtered = filtered.filter(item => {
         if (!item.abertura) return false
         const itemDate = new Date(item.abertura)
         
-        if (filters.startDate && itemDate < filters.startDate) return false
-        if (filters.endDate && itemDate > filters.endDate) return false
+        if (filters.aberturaStartDate && itemDate < filters.aberturaStartDate) return false
+        if (filters.aberturaEndDate && itemDate > filters.aberturaEndDate) return false
+        
+        return true
+      })
+    }
+
+    // Filter by fechamento date range
+    if (filters.fechamentoStartDate || filters.fechamentoEndDate) {
+      filtered = filtered.filter(item => {
+        if (!item.fechamento) return false
+        const itemDate = new Date(item.fechamento)
+        
+        if (filters.fechamentoStartDate && itemDate < filters.fechamentoStartDate) return false
+        if (filters.fechamentoEndDate && itemDate > filters.fechamentoEndDate) return false
         
         return true
       })
@@ -243,7 +270,7 @@ export default function DashboardContent() {
   }, [data, filters])
 
   // Filter change handlers
-  const handleDateChange = (field: 'startDate' | 'endDate') => (date: Date | null) => {
+  const handleDateChange = (field: 'aberturaStartDate' | 'aberturaEndDate' | 'fechamentoStartDate' | 'fechamentoEndDate') => (date: Date | null) => {
     setFilters(prev => ({ ...prev, [field]: date }))
   }
 
@@ -353,19 +380,27 @@ export default function DashboardContent() {
     openOrders: filteredData.filter(order => 
       ['Aberto', 'Em Andamento', 'Pendente'].includes(order.situacao || '')
     ).length,
-    avgResolutionHours: (() => {
-      const closedOrders = filteredData.filter(order => 
-        order.abertura && order.fechamento
+    avgFirstResponseHours: (() => {
+      // Calculate average first response time (data_atendimento - data_chamado)
+      const ordersWithResponse = filteredData.filter(order => 
+        order.data_chamado && order.data_atendimento
       )
-      if (closedOrders.length === 0) return 0
       
-      const totalHours = closedOrders.reduce((sum, order) => {
-        const start = new Date(order.abertura!)
-        const end = new Date(order.fechamento!)
-        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60)
+      if (ordersWithResponse.length === 0) return 0
+      
+      const totalResponseHours = ordersWithResponse.reduce((sum, order) => {
+        const chamadoDate = new Date(order.data_chamado!)
+        const atendimentoDate = new Date(order.data_atendimento!)
+        
+        // Calculate first response time in hours
+        const responseTimeMs = atendimentoDate.getTime() - chamadoDate.getTime()
+        const responseTimeHours = responseTimeMs / (1000 * 60 * 60)
+        
+        // Only include positive response times
+        return responseTimeHours > 0 ? sum + responseTimeHours : sum
       }, 0)
       
-      return totalHours / closedOrders.length
+      return totalResponseHours / ordersWithResponse.length
     })(),
     totalCost: filteredData.reduce((sum, order) => {
       return sum + 
@@ -373,7 +408,116 @@ export default function DashboardContent() {
         (order.custo_mo || 0) + 
         (order.custo_peca || 0) + 
         (order.custo_servicoexterno || 0)
-    }, 0)
+    }, 0),
+    mtbf: (() => {
+      // Step 1: Calculate F (Total Failures) - Count CORRETIVA maintenance orders
+      const correctiveOrders = filteredData.filter(order => 
+        order.tipomanutencao && 
+        order.tipomanutencao.toUpperCase() === 'CORRETIVA'
+      )
+      const F = correctiveOrders.length
+      
+      if (F === 0) return 0 // No failures means infinite MTBF, but we'll return 0 for display
+      
+      // Step 2: Calculate N (Number of distinct equipment)
+      const uniqueEquipment = new Set(
+        filteredData
+          .map(order => order.equipamento)
+          .filter(equipment => equipment && equipment.trim() !== '')
+      )
+      const N = uniqueEquipment.size
+      
+      if (N === 0) return 0 // No equipment identified
+      
+      // Step 3: Calculate H (Total hours in the selected period)
+      let H = 0
+      
+      // If abertura date filters are applied, calculate hours between them
+      if (filters.aberturaStartDate && filters.aberturaEndDate) {
+        const timeDiff = filters.aberturaEndDate.getTime() - filters.aberturaStartDate.getTime()
+        H = timeDiff / (1000 * 60 * 60) // Convert to hours
+      } else {
+        // If no date filters, calculate from data span
+        const dates = filteredData
+          .map(order => order.abertura)
+          .filter(date => date)
+          .map(date => new Date(date!))
+          .sort((a, b) => a.getTime() - b.getTime())
+        
+        if (dates.length >= 2) {
+          const firstDate = dates[0]
+          const lastDate = dates[dates.length - 1]
+          H = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60)
+        } else {
+          // Default to 1 year (8760 hours) if can't determine period
+          H = 8760
+        }
+      }
+      
+      // Step 4: Calculate T (Total Operation Time) = N × H
+      const T = N * H
+      
+      // Step 5: Calculate MTBF = T / F
+      const mtbfHours = T / F
+      
+      return mtbfHours
+    })(),
+    mttr: (() => {
+      // Step 1: Filter for corrective maintenance orders only
+      const correctiveOrders = filteredData.filter(order => 
+        order.tipomanutencao && 
+        order.tipomanutencao.toUpperCase() === 'CORRETIVA' &&
+        order.data_chamado &&
+        order.fechamento
+      )
+      
+      // Step 2: Count total corrective maintenance orders (F)
+      const F = correctiveOrders.length
+      
+      if (F === 0) return 0 // No corrective maintenance orders
+      
+      // Step 3: Calculate total repair time (ΣTr)
+      const totalRepairTimeHours = correctiveOrders.reduce((sum, order) => {
+        const chamadoDate = new Date(order.data_chamado!)
+        const fechamentoDate = new Date(order.fechamento!)
+        
+        // Calculate repair time: fechamento - data_chamado
+        const repairTimeMs = fechamentoDate.getTime() - chamadoDate.getTime()
+        const repairTimeHours = repairTimeMs / (1000 * 60 * 60) // Convert to hours
+        
+        // Only include positive repair times (fechamento after chamado)
+        return repairTimeHours > 0 ? sum + repairTimeHours : sum
+      }, 0)
+      
+      // Step 4: Calculate MTTR = ΣTr / F
+      const mttrHours = totalRepairTimeHours / F
+      
+      return mttrHours
+    })(),
+    taxaCumprimentoPlanejadas: (() => {
+      // Step 1: Count total planned orders (causa = "PLANEJAMENTO")
+      const plannedOrders = filteredData.filter(order => 
+        order.causa && 
+        order.causa.toUpperCase() === 'PLANEJAMENTO'
+      )
+      
+      const totalPlanned = plannedOrders.length
+      
+      if (totalPlanned === 0) return 0 // No planned orders
+      
+      // Step 2: Count completed planned orders (causa = "PLANEJAMENTO" AND fechamento is not null/empty)
+      const completedPlannedOrders = plannedOrders.filter(order => 
+        order.fechamento && 
+        order.fechamento.trim() !== ''
+      )
+      
+      const totalCompleted = completedPlannedOrders.length
+      
+      // Step 3: Calculate completion rate = (completed / total) * 100
+      const completionRate = (totalCompleted / totalPlanned) * 100
+      
+      return completionRate
+    })()
   }
 
   // Process filtered data for time series chart
@@ -542,6 +686,86 @@ export default function DashboardContent() {
       })
   })()
 
+  // Process filtered data for causa chart
+  const causaData = (() => {
+    const causaCount: Record<string, number> = {}
+    
+    filteredData.forEach(order => {
+      const causa = order.causa || 'Não informado'
+      causaCount[causa] = (causaCount[causa] || 0) + 1
+    })
+
+    const totalOrders = filteredData.length
+    
+    return Object.entries(causaCount)
+      .map(([causa, count]) => ({
+        causa,
+        count,
+        percentage: totalOrders > 0 ? (count / totalOrders) * 100 : 0
+      }))
+      .sort((a, b) => b.count - a.count)
+  })()
+
+  // Process filtered data for familia chart
+  const familiaData = (() => {
+    const familiaCount: Record<string, number> = {}
+    
+    filteredData.forEach(order => {
+      const familia = order.familia || 'Não informado'
+      familiaCount[familia] = (familiaCount[familia] || 0) + 1
+    })
+
+    const totalOrders = filteredData.length
+    
+    return Object.entries(familiaCount)
+      .map(([familia, count]) => ({
+        familia,
+        count,
+        percentage: totalOrders > 0 ? (count / totalOrders) * 100 : 0
+      }))
+      .sort((a, b) => b.count - a.count)
+  })()
+
+  // Process filtered data for tipomanutencao chart
+  const tipoManutencaoData = (() => {
+    const tipoCount: Record<string, number> = {}
+    
+    filteredData.forEach(order => {
+      const tipo = order.tipomanutencao || 'Não informado'
+      tipoCount[tipo] = (tipoCount[tipo] || 0) + 1
+    })
+
+    const totalOrders = filteredData.length
+    
+    return Object.entries(tipoCount)
+      .map(([tipomanutencao, count]) => ({
+        tipomanutencao,
+        count,
+        percentage: totalOrders > 0 ? (count / totalOrders) * 100 : 0
+      }))
+      .sort((a, b) => b.count - a.count)
+  })()
+
+  // Process filtered data for setor chart
+  const setorData = (() => {
+    const setorCount: Record<string, number> = {}
+    
+    filteredData.forEach(order => {
+      const setor = order.setor || 'Não informado'
+      setorCount[setor] = (setorCount[setor] || 0) + 1
+    })
+
+    const totalOrders = filteredData.length
+    
+    return Object.entries(setorCount)
+      .map(([setor, count]) => ({
+        setor,
+        count,
+        percentage: totalOrders > 0 ? (count / totalOrders) * 100 : 0
+      }))
+      .sort((a, b) => b.count - a.count)
+  })()
+
   // Sort filtered data for table display
   const sortedData = React.useMemo(() => {
     const comparator = (a: MaintenanceOrder, b: MaintenanceOrder): number => {
@@ -598,20 +822,38 @@ export default function DashboardContent() {
           </Typography>
           
           <Grid container spacing={3}>
-            {/* Filtros de Data */}
+            {/* Filtros de Data de Abertura */}
             <Grid item xs={12} sm={6} md={3}>
               <DatePicker
-                label="Data Inicial"
-                value={filters.startDate}
-                onChange={handleDateChange('startDate')}
+                label="Abertura - Data Inicial"
+                value={filters.aberturaStartDate}
+                onChange={handleDateChange('aberturaStartDate')}
                 slotProps={{ textField: { fullWidth: true } }}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <DatePicker
-                label="Data Final"
-                value={filters.endDate}
-                onChange={handleDateChange('endDate')}
+                label="Abertura - Data Final"
+                value={filters.aberturaEndDate}
+                onChange={handleDateChange('aberturaEndDate')}
+                slotProps={{ textField: { fullWidth: true } }}
+              />
+            </Grid>
+
+            {/* Filtros de Data de Fechamento */}
+            <Grid item xs={12} sm={6} md={3}>
+              <DatePicker
+                label="Fechamento - Data Inicial"
+                value={filters.fechamentoStartDate}
+                onChange={handleDateChange('fechamentoStartDate')}
+                slotProps={{ textField: { fullWidth: true } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <DatePicker
+                label="Fechamento - Data Final"
+                value={filters.fechamentoEndDate}
+                onChange={handleDateChange('fechamentoEndDate')}
                 slotProps={{ textField: { fullWidth: true } }}
               />
             </Grid>
@@ -819,6 +1061,22 @@ export default function DashboardContent() {
       <Box mb={4}>
         <ResponseTimeTrendChart data={responseTimeData} loading={loading} />
       </Box>
+
+      {/* Analysis Charts */}
+      <Grid container spacing={3} mb={4}>
+        <Grid item xs={12} lg={6}>
+          <CausaChart data={causaData} loading={loading} />
+        </Grid>
+        <Grid item xs={12} lg={6}>
+          <FamiliaChart data={familiaData} loading={loading} />
+        </Grid>
+        <Grid item xs={12} lg={6}>
+          <TipoManutencaoChart data={tipoManutencaoData} loading={loading} />
+        </Grid>
+        <Grid item xs={12} lg={6}>
+          <SetorChart data={setorData} loading={loading} />
+        </Grid>
+      </Grid>
 
       {/* Data Summary */}
       <Grid container spacing={3}>

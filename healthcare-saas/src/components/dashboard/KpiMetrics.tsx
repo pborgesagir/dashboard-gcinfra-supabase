@@ -7,17 +7,19 @@ import {
   CheckCircle, 
   AttachMoney,
   Timeline,
-  Error 
+  Error,
+  AssignmentTurnedIn 
 } from '@mui/icons-material'
 
 interface KpiMetricsProps {
   data: {
     totalOrders: number
     openOrders: number
-    avgResolutionHours: number
+    avgFirstResponseHours: number
     totalCost: number
     mttr?: number
     mtbf?: number
+    taxaCumprimentoPlanejadas?: number
   } | null
   loading: boolean
 }
@@ -50,8 +52,8 @@ export default function KpiMetrics({ data, loading }: KpiMetricsProps) {
       format: formatNumber
     },
     {
-      title: 'Tempo Médio de Resolução',
-      value: data?.avgResolutionHours || 0,
+      title: 'Tempo Médio de 1º Atendimento',
+      value: data?.avgFirstResponseHours || 0,
       icon: Timeline,
       color: '#388e3c',
       format: (val: number) => `${val.toFixed(1)}h`,
@@ -77,15 +79,23 @@ export default function KpiMetrics({ data, loading }: KpiMetricsProps) {
       value: data?.mtbf || 0,
       icon: CheckCircle,
       color: '#1976d2',
-      format: (val: number) => `${val.toFixed(0)}d`,
-      suffix: 'dias'
+      format: (val: number) => `${val.toFixed(1)}h`,
+      suffix: 'horas'
+    },
+    {
+      title: 'Taxa de Cumprimento de OS Planejadas',
+      value: data?.taxaCumprimentoPlanejadas || 0,
+      icon: AssignmentTurnedIn,
+      color: '#2e7d32',
+      format: (val: number) => `${val.toFixed(1)}%`,
+      suffix: 'percentual'
     }
   ]
 
   return (
     <Grid container spacing={3}>
       {kpis.map((kpi) => (
-        <Grid item xs={12} sm={6} md={4} lg={2} key={kpi.title}>
+        <Grid item xs={12} sm={6} md={4} lg={true} key={kpi.title}>
           <Card 
             sx={{ 
               height: '100%',
