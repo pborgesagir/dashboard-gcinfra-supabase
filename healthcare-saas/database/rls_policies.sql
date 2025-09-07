@@ -24,6 +24,7 @@ AS $$
 $$;
 
 -- COMPANIES TABLE POLICIES
+-- Companies table is read-only and automatically managed by the system
 
 -- Admins can see all companies, managers can only see their own company
 CREATE POLICY "Users can view companies based on role" ON companies
@@ -34,20 +35,12 @@ USING (
   id = auth.get_user_company_id()
 );
 
--- Only admins can insert companies
-CREATE POLICY "Only admins can insert companies" ON companies
-FOR INSERT
-WITH CHECK (auth.get_user_role() = 'admin');
+-- Companies table is read-only: No INSERT, UPDATE, or DELETE allowed for any user
+-- The table is automatically synchronized from building_orders data via triggers
+-- This ensures companies table remains as a system-managed, read-only list
 
--- Only admins can update companies
-CREATE POLICY "Only admins can update companies" ON companies
-FOR UPDATE
-USING (auth.get_user_role() = 'admin');
-
--- Only admins can delete companies
-CREATE POLICY "Only admins can delete companies" ON companies
-FOR DELETE
-USING (auth.get_user_role() = 'admin');
+-- NOTE: The automatic synchronization is handled by database triggers and functions
+-- that operate outside of RLS constraints (using SECURITY DEFINER functions)
 
 -- USERS TABLE POLICIES
 

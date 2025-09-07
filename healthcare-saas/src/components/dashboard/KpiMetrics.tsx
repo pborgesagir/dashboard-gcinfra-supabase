@@ -84,7 +84,7 @@ export default function KpiMetrics({ data, loading }: KpiMetricsProps) {
 
   return (
     <Grid container spacing={3}>
-      {kpis.map((kpi, index) => (
+      {kpis.map((kpi) => (
         <Grid item xs={12} sm={6} md={4} lg={2} key={kpi.title}>
           <Card 
             sx={{ 

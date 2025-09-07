@@ -38,7 +38,7 @@ import { UserRole, Database } from '@/lib/supabase/database.types'
 type User = Database['public']['Tables']['users']['Row'] & {
   company?: {
     name: string
-    slug: string
+    acronym: string
   }
 }
 
@@ -71,7 +71,7 @@ export default function UserManagement() {
           *,
           companies:company_id (
             name,
-            slug
+            acronym
           )
         `)
         .order('created_at', { ascending: false })
@@ -140,8 +140,8 @@ export default function UserManagement() {
       setInviteDialogOpen(false)
       setInviteForm({ email: '', role: 'manager', companyId: '' })
       fetchInvitations()
-    } catch (error: any) {
-      setError(error.message || 'Failed to send invitation')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to send invitation')
     } finally {
       setLoading(false)
     }
@@ -169,8 +169,8 @@ export default function UserManagement() {
       setEditDialogOpen(false)
       setSelectedUser(null)
       fetchUsers()
-    } catch (error: any) {
-      setError(error.message || 'Failed to update user')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to update user')
     } finally {
       setLoading(false)
     }
@@ -190,8 +190,8 @@ export default function UserManagement() {
 
       setSuccess('User deleted successfully!')
       fetchUsers()
-    } catch (error: any) {
-      setError(error.message || 'Failed to delete user')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to delete user')
     } finally {
       setLoading(false)
     }

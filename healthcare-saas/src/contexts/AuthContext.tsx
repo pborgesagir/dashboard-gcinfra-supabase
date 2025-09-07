@@ -13,7 +13,7 @@ export interface UserProfile {
   company?: {
     id: string
     name: string
-    slug: string
+    acronym: string
   }
 }
 
@@ -22,7 +22,7 @@ interface AuthContextType {
   userProfile: UserProfile | null
   session: Session | null
   loading: boolean
-  signInWithEmail: (email: string, password: string) => Promise<{ error: any }>
+  signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   isAdmin: boolean
   isManager: boolean
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           companies:company_id (
             id,
             name,
-            slug
+            acronym
           )
         `)
         .eq('id', userId)
@@ -76,7 +76,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         email: data.email,
         role: data.role,
         company_id: data.company_id,
-        company: data.companies ? data.companies : undefined
+        company: data.companies ? {
+          id: data.companies.id,
+          name: data.companies.name,
+          acronym: data.companies.acronym
+        } : undefined
       } as UserProfile
     } catch (error) {
       console.error('Error fetching user profile:', error)
@@ -102,38 +106,55 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user || null)
-      
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id)
-        setUserProfile(profile)
-      }
-      
-      setLoading(false)
-    }
-
-    getInitialSession()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
         setSession(session)
         setUser(session?.user || null)
         
         if (session?.user) {
           const profile = await fetchUserProfile(session.user.id)
           setUserProfile(profile)
-        } else {
-          setUserProfile(null)
         }
-        
+      } catch (error) {
+        console.error('Error getting initial session:', error)
+      } finally {
         setLoading(false)
+      }
+    }
+
+    // Set a timeout to prevent indefinite loading
+    const timeout = setTimeout(() => {
+      console.warn('Auth initialization timeout, setting loading to false')
+      setLoading(false)
+    }, 10000) // 10 seconds timeout
+
+    getInitialSession().then(() => clearTimeout(timeout))
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        try {
+          setSession(session)
+          setUser(session?.user || null)
+          
+          if (session?.user) {
+            const profile = await fetchUserProfile(session.user.id)
+            setUserProfile(profile)
+          } else {
+            setUserProfile(null)
+          }
+        } catch (error) {
+          console.error('Error handling auth state change:', error)
+        } finally {
+          setLoading(false)
+        }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const value = {

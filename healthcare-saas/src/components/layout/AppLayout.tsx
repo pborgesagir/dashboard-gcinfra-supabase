@@ -29,8 +29,11 @@ import {
   Analytics,
   Settings,
   ExitToApp,
-  MedicalServices
+  MedicalServices,
+  ChevronLeft,
+  ChevronRight
 } from '@mui/icons-material'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 
 interface AppLayoutProps {
   children: ReactNode
@@ -40,6 +43,7 @@ const drawerWidth = 280
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   
   const { userProfile, signOut, isAdmin } = useAuth()
@@ -47,6 +51,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
+  }
+
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen)
   }
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -71,37 +79,37 @@ export default function AppLayout({ children }: AppLayoutProps) {
       show: true
     },
     {
-      text: 'Clinical Engineering',
+      text: 'Engenharia Clínica',
       icon: <MedicalServices />,
       path: isAdmin ? '/admin/clinical' : '/clinical',
       show: true
     },
     {
-      text: 'Building Engineering',
+      text: 'Engenharia Predial',
       icon: <Build />,
       path: isAdmin ? '/admin/building' : '/building',
       show: true
     },
     {
-      text: 'Analytics',
+      text: 'Análises',
       icon: <Analytics />,
       path: isAdmin ? '/admin/analytics' : '/analytics',
       show: true
     },
     {
-      text: 'Companies',
+      text: 'Empresas',
       icon: <Business />,
       path: '/admin/companies',
       show: isAdmin
     },
     {
-      text: 'User Management',
+      text: 'Gerenciar Usuários',
       icon: <People />,
       path: '/admin/users',
       show: isAdmin
     },
     {
-      text: 'Settings',
+      text: 'Configurações',
       icon: <Settings />,
       path: '/settings',
       show: true
@@ -110,39 +118,43 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const drawer = (
     <Box>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
         <MedicalServices sx={{ color: 'primary.main' }} />
-        <Box>
-          <Typography variant="h6" noWrap>
-            Healthcare SaaS
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Infrastructure Management
-          </Typography>
-        </Box>
+        {sidebarOpen && (
+          <Box>
+            <Typography variant="h6" noWrap>
+              Healthcare SaaS
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Gerenciamento de Infraestrutura
+            </Typography>
+          </Box>
+        )}
       </Box>
       
       <Divider />
       
-      <Box sx={{ p: 2 }}>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          {userProfile?.email}
-        </Typography>
-        <Box display="flex" gap={1}>
-          <Chip 
-            label={userProfile?.role} 
-            size="small" 
-            color={isAdmin ? 'error' : 'primary'}
-          />
-          {userProfile?.company && (
+      {sidebarOpen && (
+        <Box sx={{ p: 2 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {userProfile?.email}
+          </Typography>
+          <Box display="flex" gap={1} flexWrap="wrap">
             <Chip 
-              label={userProfile.company.name} 
+              label={userProfile?.role} 
               size="small" 
-              variant="outlined"
+              color={isAdmin ? 'error' : 'primary'}
             />
-          )}
+            {userProfile?.company && (
+              <Chip 
+                label={userProfile.company.name} 
+                size="small" 
+                variant="outlined"
+              />
+            )}
+          </Box>
         </Box>
-      </Box>
+      )}
       
       <Divider />
       
@@ -151,17 +163,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
           .filter(item => item.show)
           .map((item) => (
             <ListItem
-              button
               key={item.text}
               onClick={() => {
                 router.push(item.path)
                 setMobileOpen(false)
               }}
+              sx={{
+                cursor: 'pointer',
+                '&:hover': {
+                  backgroundColor: 'action.hover'
+                }
+              }}
             >
-              <ListItemIcon>
+              <ListItemIcon sx={{ minWidth: sidebarOpen ? 56 : 'auto', justifyContent: 'center' }}>
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text} />
+              {sidebarOpen && <ListItemText primary={item.text} />}
             </ListItem>
           ))}
       </List>
@@ -173,8 +190,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` }
+          width: { sm: sidebarOpen ? `calc(100% - ${drawerWidth}px)` : `calc(100% - 72px)` },
+          ml: { sm: sidebarOpen ? `${drawerWidth}px` : '72px' },
+          transition: 'width 0.3s, margin 0.3s'
         }}
       >
         <Toolbar>
@@ -188,9 +206,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <MenuIcon />
           </IconButton>
           
+          <IconButton
+            color="inherit"
+            aria-label="alternar sidebar"
+            onClick={handleSidebarToggle}
+            sx={{ mr: 2, display: { xs: 'none', sm: 'inline-flex' } }}
+          >
+            {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
+          </IconButton>
+          
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {isAdmin ? 'Admin Panel' : 'Dashboard'}
+            {isAdmin ? 'Painel Administrativo' : 'Dashboard'}
           </Typography>
+          
+          <ThemeToggle />
           
           <div>
             <IconButton
@@ -232,8 +261,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
       
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
+        sx={{ 
+          width: { sm: sidebarOpen ? drawerWidth : 72 }, 
+          flexShrink: { sm: 0 },
+          transition: 'width 0.3s'
+        }}
+        aria-label="folders de navegação"
       >
         <Drawer
           variant="temporary"
@@ -244,7 +277,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              overflowX: 'hidden'
+            },
           }}
         >
           {drawer}
@@ -253,7 +290,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: sidebarOpen ? drawerWidth : 72,
+              transition: 'width 0.3s',
+              overflowX: 'hidden'
+            },
           }}
           open
         >
@@ -266,7 +308,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { sm: sidebarOpen ? `calc(100% - ${drawerWidth}px)` : `calc(100% - 72px)` },
+          transition: 'width 0.3s, margin 0.3s',
           mt: 8
         }}
       >

@@ -78,8 +78,8 @@ class MultiTenantMaintenanceDataExtractor:
             if empresa_name.lower() in company_name.lower() or company_name.lower() in empresa_name.lower():
                 return company_id
         
-        # Create new company if not found
-        return self.create_company_if_not_exists(empresa_name)
+        # For maintenance orders, create company if needed (fallback)
+        return self.create_company_from_building_data(empresa_name)
 
     def create_company_if_not_exists(self, empresa_name: str) -> Optional[str]:
         """Create a new company if it doesn't exist"""
@@ -331,12 +331,15 @@ class MultiTenantBuildingEngineeringDataExtractor:
         
         # For building data, we might have different empresa names
         # so we create new companies as needed
-        return self.create_company_if_not_exists(empresa_name)
+        return None  # Will be handled in sync_companies_from_building_orders
 
-    def create_company_if_not_exists(self, empresa_name: str) -> Optional[str]:
-        """Create a new company if it doesn't exist"""
+    def create_company_from_building_data(self, empresa_name: str, razao_social: str = None) -> Optional[str]:
+        """Create a new company using proper mapping from building_orders data"""
         try:
-            # Generate slug from name
+            # Use razaosocial as company name, fallback to empresa_name if not provided
+            company_name = razao_social if razao_social else empresa_name
+            
+            # Use empresa_name as slug (URL-friendly identifier)
             slug = empresa_name.lower().replace(' ', '-').replace('ã', 'a').replace('ç', 'c')
             slug = ''.join(c for c in slug if c.isalnum() or c == '-')
             
@@ -346,7 +349,7 @@ class MultiTenantBuildingEngineeringDataExtractor:
                 slug = f"{slug}-{int(time.time())}"
             
             result = self.supabase.table('companies').insert({
-                'name': empresa_name,
+                'name': company_name,
                 'slug': slug,
                 'is_active': True
             }).execute()
@@ -354,11 +357,11 @@ class MultiTenantBuildingEngineeringDataExtractor:
             if result.data:
                 company_id = result.data[0]['id']
                 self.company_mapping[empresa_name] = company_id
-                logger.info(f"Created new company for building data: {empresa_name} with ID: {company_id}")
+                logger.info(f"Created new company from building data - Name: {company_name}, Slug: {slug}, ID: {company_id}")
                 return company_id
             
         except Exception as e:
-            logger.error(f"Failed to create company {empresa_name} for building data: {e}")
+            logger.error(f"Failed to create company from building data {empresa_name}/{razao_social}: {e}")
         
         return None
 
@@ -406,12 +409,40 @@ class MultiTenantBuildingEngineeringDataExtractor:
         logger.info(f"Total building records fetched: {len(all_data)}")
         return all_data
 
+    def sync_companies_from_building_orders(self, df: pd.DataFrame) -> None:
+        """Synchronize companies table based on building_orders data"""
+        if df.empty:
+            return
+        
+        logger.info("Synchronizing companies from building_orders data...")
+        
+        # Get unique combinations of empresa, razaosocial from building_orders
+        unique_companies = df[['empresa', 'razaosocial']].drop_duplicates()
+        
+        for _, row in unique_companies.iterrows():
+            empresa_name = row['empresa']
+            razao_social = row['razaosocial']
+            
+            if not empresa_name:
+                continue
+                
+            # Check if this company already exists in our mapping
+            if empresa_name not in self.company_mapping:
+                company_id = self.create_company_from_building_data(empresa_name, razao_social)
+                if company_id:
+                    self.company_mapping[empresa_name] = company_id
+                    
+        logger.info(f"Company synchronization completed. Total companies: {len(self.company_mapping)}")
+
     def clean_and_transform_building_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and transform building engineering data with multi-tenant support."""
         if df.empty:
             return pd.DataFrame()
 
-        # Add company_id mapping
+        # First, synchronize companies from building_orders data
+        self.sync_companies_from_building_orders(df)
+        
+        # Then map company_id using updated mapping
         logger.info("Mapping company IDs for building data...")
         df['company_id'] = df['empresa'].apply(self.map_company_id)
 
@@ -494,6 +525,7 @@ class MultiTenantBuildingEngineeringDataExtractor:
             if initial_rows > final_rows:
                 logger.info(f"Removed {initial_rows - final_rows} duplicate building 'os' records.")
 
+            # Clean and transform data (this will also sync companies)
             cleaned_df = self.clean_and_transform_building_data(building_df)
             success = self.insert_building_data_to_supabase(cleaned_df)
             return success

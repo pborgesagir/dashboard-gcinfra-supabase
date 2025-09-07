@@ -20,6 +20,10 @@ export default function Home() {
         } else {
           router.push('/dashboard')
         }
+      } else if (user && !userProfile) {
+        // User exists but profile is null - redirect to login to retry auth
+        console.warn('User exists but profile could not be loaded, redirecting to login')
+        router.push('/auth/login')
       }
     }
   }, [user, userProfile, loading, router])

@@ -26,16 +26,19 @@ The application follows a two-tier architecture:
 ## Development Commands
 
 ### Running the Application
+
 ```bash
 streamlit run bi_dashboard.py
 ```
 
 ### Data Extraction
+
 ```bash
 python data_extraction.py
 ```
 
 ### Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -43,6 +46,7 @@ pip install -r requirements.txt
 ## Configuration
 
 The application requires environment variables set in `.env`:
+
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_KEY`: Supabase API key
 - `API_TOKEN`: External API authentication token
@@ -57,7 +61,13 @@ A GitHub Action workflow (`.github/workflows/update_database.yml`) runs daily at
 ## Data Structure
 
 The application works with maintenance data containing:
+
 - Work orders (OS) with priorities, complexity levels, and timestamps
-- Equipment information with serial numbers, models, and locations  
+- Equipment information with serial numbers, models, and locations
 - Maintenance metrics like MTTR, MTBF, and availability calculations
 - Cost tracking for parts, labor, and external services
+
+## Language
+
+The users of this application are brazilian, so all UI elements must be displayed in brazilian portuguese.No matter if it is in the sibebar or the name of a column in a table, all should be in portuguese.
+1
