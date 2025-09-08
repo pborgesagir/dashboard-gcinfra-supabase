@@ -145,26 +145,30 @@ export default function CompleteInvitationPage() {
       if (authError) throw authError;
 
       if (authData.user) {
-        await supabase
-          .from("users")
-          .insert({
+        const { error: insertError } = await (supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("users") as any)
+          .upsert({
             id: authData.user.id,
             email: invitation.email,
             full_name: formData.fullName,
-            role: invitation.role,
+            role: invitation.role as 'admin' | 'manager',
             company_id: invitation.company_id,
             is_active: true,
-          })
-          .throwOnError();
+          });
 
-        await supabase
-          .from("user_invitations")
+        if (insertError) throw insertError;
+
+        const { error: updateError } = await (supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("user_invitations") as any)
           .update({
             status: "accepted",
             accepted_at: new Date().toISOString(),
           })
-          .eq("id", invitation.id)
-          .throwOnError();
+          .eq("id", invitation.id);
+
+        if (updateError) throw updateError;
 
         setSuccess(true);
 

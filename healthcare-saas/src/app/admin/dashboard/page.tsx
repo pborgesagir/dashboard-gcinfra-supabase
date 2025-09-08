@@ -1,12 +1,12 @@
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
 import AppLayout from '@/components/layout/AppLayout'
-import DashboardContent from '@/components/dashboard/DashboardContent'
+import BenchmarkingDashboardContent from '@/components/dashboard/BenchmarkingDashboardContent'
 
 export default function AdminDashboardPage() {
   return (
     <ProtectedRoute requiredRole="admin">
       <AppLayout>
-        <DashboardContent />
+        <BenchmarkingDashboardContent />
       </AppLayout>
     </ProtectedRoute>
   )

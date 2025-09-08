@@ -58,19 +58,23 @@ export default function CompanyManagement() {
             supabase
               .from('users')
               .select('id', { count: 'exact' })
-              .eq('company_id', company.id),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .eq('company_id', (company as any).id),
             supabase
               .from('maintenance_orders')
               .select('id', { count: 'exact' })
-              .eq('company_id', company.id),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .eq('company_id', (company as any).id),
             supabase
               .from('building_orders')
               .select('id', { count: 'exact' })
-              .eq('company_id', company.id)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .eq('company_id', (company as any).id)
           ])
 
           return {
-            ...company,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...(company as any),
             user_count: usersResult.count || 0,
             maintenance_order_count: maintenanceResult.count || 0,
             building_order_count: buildingResult.count || 0

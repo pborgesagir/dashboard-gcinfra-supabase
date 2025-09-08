@@ -125,8 +125,9 @@ export default function UserManagement() {
       expiresAt.setDate(expiresAt.getDate() + 7) // Expires in 7 days
 
       // Insert invitation in database
-      const { error: dbError } = await supabase
-        .from('user_invitations')
+      const { error: dbError } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('user_invitations') as any)
         .insert({
           email: inviteForm.email,
           role: inviteForm.role,
@@ -174,8 +175,9 @@ export default function UserManagement() {
       setLoading(true)
       setError(null)
 
-      const { error } = await supabase
-        .from('users')
+      const { error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from('users') as any)
         .update({
           role: selectedUser.role,
           company_id: selectedUser.role === 'admin' ? null : selectedUser.company_id,
