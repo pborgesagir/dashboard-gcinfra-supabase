@@ -35,7 +35,6 @@ class MultiTenantMaintenanceDataExtractor:
         # Initialize Supabase client with service role key for bypassing RLS
         self.supabase: Client = create_client(self.SUPABASE_URL, self.SUPABASE_KEY)
         
-        # Column mapping including the new columns
         self.columns = [
             'empresa', 'razaosocial', 'grupo_setor', 'os', 'oficina', 'tipo', 'prioridade',
             'complexidade', 'tag', 'patrimonio', 'sn', 'equipamento', 'setor', 'abertura',
@@ -47,66 +46,74 @@ class MultiTenantMaintenanceDataExtractor:
             'obs_requisicao', 'pendencia', 'inicio_pendencia', 'fechamento_pendencia',
             'familia', 'modelo', 'tipoequipamento', 'fabricante', 'nserie', 
             'tombamento', 'cadastro', 'instalacao', 'garantia', 'verificacao',
-            'company_id'  # Added for multi-tenancy
+            'company_id'
         ]
 
-        # Company mapping - maps API empresa names to company UUIDs
-        self.company_mapping = {}
+        # CORRECTED: Dictionaries for case-insensitive mapping
+        self.company_name_mapping = {}
+        self.company_acronym_mapping = {}
         self.load_company_mapping()
 
     def load_company_mapping(self):
-        """Load company mapping from database"""
+        """Load company mappings from database, ensuring case-insensitivity."""
         try:
-            result = self.supabase.table('companies').select('id, name').eq('is_active', True).execute()
+            result = self.supabase.table('companies').select('id, name, acronym').eq('is_active', True).execute()
             for company in result.data:
-                self.company_mapping[company['name']] = company['id']
-            logger.info(f"Loaded {len(self.company_mapping)} company mappings")
+                if company.get('name'):
+                    self.company_name_mapping[company['name'].lower()] = company['id']
+                if company.get('acronym'):
+                    self.company_acronym_mapping[company['acronym'].lower()] = company['id']
+            logger.info(f"Loaded {len(self.company_name_mapping)} name and {len(self.company_acronym_mapping)} acronym mappings.")
         except Exception as e:
             logger.error(f"Failed to load company mapping: {e}")
 
     def map_company_id(self, empresa_name: str) -> Optional[str]:
-        """Map empresa name to company_id"""
+        """Map empresa name to company_id using a robust, case-insensitive strategy."""
         if not empresa_name:
             return None
         
-        # Direct mapping first
-        if empresa_name in self.company_mapping:
-            return self.company_mapping[empresa_name]
-        
-        # Fuzzy matching for similar names
-        for company_name, company_id in self.company_mapping.items():
-            if empresa_name.lower() in company_name.lower() or company_name.lower() in empresa_name.lower():
-                return company_id
-        
-        # For maintenance orders, create company if needed (fallback)
-        return self.create_company_from_building_data(empresa_name)
+        lower_empresa_name = empresa_name.lower()
+
+        # 1. Check against the acronym mapping (most reliable)
+        if lower_empresa_name in self.company_acronym_mapping:
+            return self.company_acronym_mapping[lower_empresa_name]
+
+        # 2. Check against the full name mapping
+        if lower_empresa_name in self.company_name_mapping:
+            return self.company_name_mapping[lower_empresa_name]
+
+        # 3. If no match found, create a new company
+        return self.create_company_if_not_exists(empresa_name)
 
     def create_company_if_not_exists(self, empresa_name: str) -> Optional[str]:
-        """Create a new company if it doesn't exist"""
+        """Create a new company if it doesn't exist, with a case-insensitive check."""
         try:
-            # Generate slug from name
-            slug = empresa_name.lower().replace(' ', '-').replace('ã', 'a').replace('ç', 'c')
-            slug = ''.join(c for c in slug if c.isalnum() or c == '-')
-            
-            # Check if slug already exists and make it unique
-            existing_slug_result = self.supabase.table('companies').select('slug').eq('slug', slug).execute()
-            if existing_slug_result.data:
-                slug = f"{slug}-{int(time.time())}"
-            
+            acronym = empresa_name.lower().replace(' ', '-').replace('ã', 'a').replace('ç', 'c')
+            acronym = ''.join(c for c in acronym if c.isalnum() or c == '-')
+
+            # Case-insensitive check to see if acronym already exists
+            existing_company = self.supabase.table('companies').select('id').ilike('acronym', acronym).execute()
+            if existing_company.data:
+                logger.warning(f"Company with acronym '{acronym}' already exists. Using existing ID.")
+                return existing_company.data[0]['id']
+
+            # If it doesn't exist, create it
             result = self.supabase.table('companies').insert({
                 'name': empresa_name,
-                'slug': slug,
+                'acronym': acronym,
                 'is_active': True
             }).execute()
             
             if result.data:
                 company_id = result.data[0]['id']
-                self.company_mapping[empresa_name] = company_id
-                logger.info(f"Created new company: {empresa_name} with ID: {company_id}")
+                # Update local mappings immediately
+                self.company_name_mapping[empresa_name.lower()] = company_id
+                self.company_acronym_mapping[acronym] = company_id
+                logger.info(f"Created new company: '{empresa_name}' with ID: {company_id}")
                 return company_id
             
         except Exception as e:
-            logger.error(f"Failed to create company {empresa_name}: {e}")
+            logger.error(f"Failed to create company '{empresa_name}': {e}")
         
         return None
 
@@ -172,17 +179,14 @@ class MultiTenantMaintenanceDataExtractor:
         if df.empty:
             return pd.DataFrame()
         
-        # Add company_id mapping
         logger.info("Mapping company IDs...")
         df['company_id'] = df['empresa'].apply(self.map_company_id)
         
-        # Ensure all columns exist
         for col in self.columns:
             if col not in df.columns:
                 df[col] = None
         df = df[self.columns]
         
-        # Clean date columns
         date_columns = [
             'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento', 
             'data_solucao', 'data_chamado', 'data_inicial_mo', 'data_fim_mo', 
@@ -193,18 +197,17 @@ class MultiTenantMaintenanceDataExtractor:
             df[col] = pd.to_datetime(df[col], errors='coerce')
             df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) else None)
         
-        # Clean numeric columns
         numeric_columns = ['custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno', 'qtd_mo_min']
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
             df[col] = df[col].apply(lambda x: float(x) if pd.notna(x) else None)
         
         df = df.replace({np.nan: None, 'nan': None, 'None': None, '': None})
-        logger.info(f"Cleaned and transformed {len(df)} records with multi-tenant support.")
+        logger.info(f"Cleaned and transformed {len(df)} records.")
         return df
 
     def insert_data_to_supabase(self, df: pd.DataFrame) -> bool:
-        """Insert data into Supabase using upsert with multi-tenant support."""
+        """Insert data into Supabase using upsert."""
         if df.empty:
             logger.info("No data to insert.")
             return True
@@ -212,26 +215,18 @@ class MultiTenantMaintenanceDataExtractor:
         try:
             records = df.to_dict('records')
             batch_size = 100
-            total_inserted = 0
-            
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
-                try:
-                    self.supabase.table('maintenance_orders').upsert(batch, on_conflict='os').execute()
-                    total_inserted += len(batch)
-                    logger.info(f"Upserted batch {i//batch_size + 1}, total: {total_inserted}/{len(records)}")
-                except Exception as batch_error:
-                    logger.error(f"Error upserting batch {i//batch_size + 1}: {batch_error}")
-                time.sleep(0.1)
-            
-            logger.info(f"Successfully upserted {total_inserted} records to Supabase with multi-tenant support.")
+                self.supabase.table('maintenance_orders').upsert(batch, on_conflict='os').execute()
+                logger.info(f"Upserted batch {i//batch_size + 1}/{len(records)//batch_size + 1}")
+            logger.info(f"Successfully upserted {len(records)} records.")
             return True
         except Exception as e:
             logger.error(f"Failed to insert data to Supabase: {e}")
             return False
 
     def extract_and_store_data(self, days_back: int = 365) -> bool:
-        """Main method to fetch from both APIs, merge, clean, and store in Supabase with multi-tenancy."""
+        """Main method to orchestrate the data extraction and storage."""
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_back)
@@ -239,33 +234,17 @@ class MultiTenantMaintenanceDataExtractor:
             
             raw_maintenance_data = self.fetch_maintenance_data(start_date, end_date)
             if not raw_maintenance_data:
-                logger.warning("No maintenance data received from API. Halting process.")
+                logger.warning("No maintenance data from API. Halting.")
                 return False
             
             maintenance_df = pd.DataFrame(raw_maintenance_data)
-            
-            # Remove duplicates
-            initial_rows = len(maintenance_df)
             maintenance_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
-            final_rows = len(maintenance_df)
-            if initial_rows > final_rows:
-                logger.info(f"Removed {initial_rows - final_rows} duplicate 'os' records.")
 
-            # Fetch equipment data
             equipment_df = self.fetch_equipment_data()
-            if not equipment_df.empty:
-                logger.info(f"Merging maintenance data ({maintenance_df.shape[0]} rows) with equipment data ({equipment_df.shape[0]} rows) on 'tag'.")
-                merged_df = pd.merge(maintenance_df, equipment_df, on='tag', how='left')
-            else:
-                logger.warning("Equipment data is empty. Proceeding without merging.")
-                merged_df = maintenance_df
+            merged_df = pd.merge(maintenance_df, equipment_df, on='tag', how='left') if not equipment_df.empty else maintenance_df
             
-            # Clean and transform data with multi-tenant support
             cleaned_df = self.clean_and_transform_data(merged_df)
-            
-            # Insert data
-            success = self.insert_data_to_supabase(cleaned_df)
-            return success
+            return self.insert_data_to_supabase(cleaned_df)
             
         except Exception as e:
             logger.error(f"An error occurred in the main process: {e}", exc_info=True)
@@ -274,21 +253,18 @@ class MultiTenantMaintenanceDataExtractor:
 
 class MultiTenantBuildingEngineeringDataExtractor:
     def __init__(self):
-        # AGIR API Configuration
+        # API Configuration
         self.AGIR_API_CONFIG = {
             'token': os.getenv("AGIR_API_TOKEN", "2050ee77-2cc7-47e0-8b82-4c8dda75ef5f"),
-            'user': os.getenv("AGIR_API_USER", "kaio"),
-            'email': os.getenv("AGIR_API_EMAIL", "adm.infraestrutura@hugol.org.br"),
             'base_url': "https://agir.api.neovero.com/api/queries/execute/consulta_os",
             'api_key_header': "X-API-KEY"
         }
 
-        # Supabase configuration (reuse existing)
+        # Supabase configuration
         self.SUPABASE_URL = os.getenv("SUPABASE_URL")
         self.SUPABASE_KEY = os.getenv("SUPABASE_KEY")
         self.supabase: Client = create_client(self.SUPABASE_URL, self.SUPABASE_KEY)
         
-        # Column mapping for building engineering data
         self.building_columns = [
             'empresa_id', 'empresa', 'razaosocial', 'grupo_setor', 'os', 'oficina', 'tipo', 
             'prioridade', 'complexidade', 'tag', 'patrimonio', 'sn', 'equipamento', 'setor', 
@@ -298,270 +274,191 @@ class MultiTenantBuildingEngineeringDataExtractor:
             'tipomanutencao', 'situacao', 'situacao_int', 'colaborador_mo', 'data_inicial_mo',
             'data_fim_mo', 'qtd_mo_min', 'obs_mo', 'servico', 'requisicao', 'avaliacao',
             'obs_requisicao', 'pendencia', 'inicio_pendencia', 'fechamento_pendencia',
-            'company_id'  # Added for multi-tenancy
+            'company_id'
         ]
 
-        # Company mapping
-        self.company_mapping = {}
+        self.company_name_mapping = {}
+        self.company_acronym_mapping = {}
         self.load_company_mapping()
 
     def load_company_mapping(self):
-        """Load company mapping from database"""
+        """Load company mappings from database, ensuring case-insensitivity."""
         try:
-            result = self.supabase.table('companies').select('id, name').eq('is_active', True).execute()
+            result = self.supabase.table('companies').select('id, name, acronym').eq('is_active', True).execute()
             for company in result.data:
-                self.company_mapping[company['name']] = company['id']
-            logger.info(f"Loaded {len(self.company_mapping)} company mappings for building data")
+                if company.get('name'):
+                    self.company_name_mapping[company['name'].lower()] = company['id']
+                if company.get('acronym'):
+                    self.company_acronym_mapping[company['acronym'].lower()] = company['id']
+            logger.info(f"Loaded {len(self.company_name_mapping)} name and {len(self.company_acronym_mapping)} acronym mappings for building data.")
         except Exception as e:
             logger.error(f"Failed to load company mapping for building data: {e}")
 
-    def map_company_id(self, empresa_name: str) -> Optional[str]:
-        """Map empresa name to company_id"""
+    def map_company_id(self, empresa_name: str, razao_social: str = None) -> Optional[str]:
+        """Map company info to a company_id, creating the company if it doesn't exist."""
         if not empresa_name:
             return None
+
+        # Prioritize matching by the more specific razao_social if available
+        name_to_check = razao_social if razao_social else empresa_name
+        lower_name_to_check = name_to_check.lower()
+
+        # 1. Check against full name mapping
+        if lower_name_to_check in self.company_name_mapping:
+            return self.company_name_mapping[lower_name_to_check]
+
+        # 2. Check acronym from empresa_name
+        lower_empresa_name = empresa_name.lower()
+        if lower_empresa_name in self.company_acronym_mapping:
+            return self.company_acronym_mapping[lower_empresa_name]
         
-        # Direct mapping first
-        if empresa_name in self.company_mapping:
-            return self.company_mapping[empresa_name]
-        
-        # Fuzzy matching for similar names
-        for company_name, company_id in self.company_mapping.items():
-            if empresa_name.lower() in company_name.lower() or company_name.lower() in empresa_name.lower():
-                return company_id
-        
-        # For building data, we might have different empresa names
-        # so we create new companies as needed
-        return None  # Will be handled in sync_companies_from_building_orders
+        # 3. If no match, create it
+        return self.create_company_from_building_data(empresa_name, razao_social)
 
     def create_company_from_building_data(self, empresa_name: str, razao_social: str = None) -> Optional[str]:
-        """Create a new company using proper mapping from building_orders data"""
+        """Create a new company, ensuring the acronym is unique (case-insensitive)."""
         try:
-            # Use razaosocial as company name, fallback to empresa_name if not provided
             company_name = razao_social if razao_social else empresa_name
-            
-            # Use empresa_name as slug (URL-friendly identifier)
-            slug = empresa_name.lower().replace(' ', '-').replace('ã', 'a').replace('ç', 'c')
-            slug = ''.join(c for c in slug if c.isalnum() or c == '-')
-            
-            # Check if slug already exists and make it unique
-            existing_slug_result = self.supabase.table('companies').select('slug').eq('slug', slug).execute()
-            if existing_slug_result.data:
-                slug = f"{slug}-{int(time.time())}"
-            
+            acronym = empresa_name.lower() # Building data 'empresa' is the acronym
+
+            existing_company = self.supabase.table('companies').select('id').ilike('acronym', acronym).execute()
+            if existing_company.data:
+                logger.warning(f"Company with acronym '{acronym}' already exists. Using existing ID.")
+                return existing_company.data[0]['id']
+
             result = self.supabase.table('companies').insert({
                 'name': company_name,
-                'slug': slug,
+                'acronym': acronym,
                 'is_active': True
             }).execute()
             
             if result.data:
                 company_id = result.data[0]['id']
-                self.company_mapping[empresa_name] = company_id
-                logger.info(f"Created new company from building data - Name: {company_name}, Slug: {slug}, ID: {company_id}")
+                self.company_name_mapping[company_name.lower()] = company_id
+                self.company_acronym_mapping[acronym] = company_id
+                logger.info(f"Created new company '{company_name}' with acronym '{acronym}'.")
                 return company_id
-            
+
         except Exception as e:
-            logger.error(f"Failed to create company from building data {empresa_name}/{razao_social}: {e}")
-        
+            logger.error(f"Failed to create company from building data '{empresa_name}': {e}")
         return None
-
-    def get_all_empresa_ids(self) -> List[int]:
-        """Get all available empresa_id values. For now, using common IDs."""
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-    def get_all_situacao_int(self) -> List[int]:
-        """Get all available situacao_int values."""
-        return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
     def fetch_building_data(self, start_date: datetime, end_date: datetime) -> List[Dict]:
         """Fetch building engineering data from AGIR API."""
         formatted_start = start_date.strftime("%Y-%m-%dT%H:%M")
         all_data = []
+        empresa_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] # Example IDs
+        situacao_ints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         
-        empresa_ids = self.get_all_empresa_ids()
-        situacao_ints = self.get_all_situacao_int()
-        
-        headers = {
-            'Content-Type': 'application/json',
-            self.AGIR_API_CONFIG['api_key_header']: self.AGIR_API_CONFIG['token']
-        }
+        headers = {'Content-Type': 'application/json', self.AGIR_API_CONFIG['api_key_header']: self.AGIR_API_CONFIG['token']}
 
         for empresa_id in empresa_ids:
             situacao_str = ','.join(map(str, situacao_ints))
             url = f"{self.AGIR_API_CONFIG['base_url']}?data_abertura_inicio={formatted_start}&empresa_id={empresa_id}&situacao_int={situacao_str}"
-            
             try:
                 logger.info(f"Fetching building data for empresa_id={empresa_id}...")
                 response = requests.get(url, headers=headers)
                 response.raise_for_status()
                 data = response.json()
-                
                 if data:
-                    logger.info(f"Fetched {len(data)} building records for empresa_id={empresa_id}")
                     all_data.extend(data)
-                
-                time.sleep(0.2)  # Rate limiting
-                
+                time.sleep(0.2)
             except requests.exceptions.RequestException as e:
                 logger.error(f"Building API request failed for empresa_id={empresa_id}: {e}")
-                continue
 
         logger.info(f"Total building records fetched: {len(all_data)}")
         return all_data
 
-    def sync_companies_from_building_orders(self, df: pd.DataFrame) -> None:
-        """Synchronize companies table based on building_orders data"""
-        if df.empty:
-            return
-        
-        logger.info("Synchronizing companies from building_orders data...")
-        
-        # Get unique combinations of empresa, razaosocial from building_orders
-        unique_companies = df[['empresa', 'razaosocial']].drop_duplicates()
-        
-        for _, row in unique_companies.iterrows():
-            empresa_name = row['empresa']
-            razao_social = row['razaosocial']
-            
-            if not empresa_name:
-                continue
-                
-            # Check if this company already exists in our mapping
-            if empresa_name not in self.company_mapping:
-                company_id = self.create_company_from_building_data(empresa_name, razao_social)
-                if company_id:
-                    self.company_mapping[empresa_name] = company_id
-                    
-        logger.info(f"Company synchronization completed. Total companies: {len(self.company_mapping)}")
-
     def clean_and_transform_building_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean and transform building engineering data with multi-tenant support."""
+        """Clean, transform, and map company IDs for building data."""
         if df.empty:
             return pd.DataFrame()
 
-        # First, synchronize companies from building_orders data
-        self.sync_companies_from_building_orders(df)
-        
-        # Then map company_id using updated mapping
         logger.info("Mapping company IDs for building data...")
-        df['company_id'] = df['empresa'].apply(self.map_company_id)
+        df['company_id'] = df.apply(lambda row: self.map_company_id(row['empresa'], row.get('razaosocial')), axis=1)
 
-        # Ensure all required columns exist
         for col in self.building_columns:
             if col not in df.columns:
                 df[col] = None
-
         df = df[self.building_columns]
 
-        # Clean date columns
         date_columns = [
             'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento', 
             'data_solucao', 'data_chamado', 'data_inicial_mo', 'data_fim_mo', 
             'inicio_pendencia', 'fechamento_pendencia'
         ]
-        
         for col in date_columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
-            df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) else None)
+            df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S').replace({pd.NaT: None})
 
-        # Clean numeric columns
         numeric_columns = ['empresa_id', 'situacao_int', 'custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno', 'qtd_mo_min']
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-        # Replace NaN values
         df = df.replace({np.nan: None, 'nan': None, 'None': None, '': None})
-        
-        logger.info(f"Cleaned and transformed {len(df)} building records with multi-tenant support.")
+        logger.info(f"Cleaned and transformed {len(df)} building records.")
         return df
 
     def insert_building_data_to_supabase(self, df: pd.DataFrame) -> bool:
-        """Insert building engineering data into Supabase with multi-tenant support."""
+        """Insert building engineering data into Supabase."""
         if df.empty:
-            logger.info("No building data to insert.")
             return True
-
         try:
             records = df.to_dict('records')
             batch_size = 100
-            total_inserted = 0
-
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
-                try:
-                    self.supabase.table('building_orders').upsert(batch, on_conflict='os').execute()
-                    total_inserted += len(batch)
-                    logger.info(f"Upserted building batch {i//batch_size + 1}, total: {total_inserted}/{len(records)}")
-                except Exception as batch_error:
-                    logger.error(f"Error upserting building batch {i//batch_size + 1}: {batch_error}")
-                
-                time.sleep(0.1)
-
-            logger.info(f"Successfully upserted {total_inserted} building records to Supabase with multi-tenant support.")
+                self.supabase.table('building_orders').upsert(batch, on_conflict='os').execute()
+                logger.info(f"Upserted building batch {i//batch_size + 1}")
             return True
-            
         except Exception as e:
-            logger.error(f"Failed to insert building data to Supabase: {e}")
+            logger.error(f"Failed to insert building data: {e}")
             return False
 
     def extract_and_store_building_data(self, days_back: int = 730) -> bool:
-        """Main method to extract and store building engineering data with multi-tenancy."""
+        """Main method for building data extraction."""
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_back)
-            logger.info(f"Extracting building data from {start_date} to {end_date}")
-
-            raw_building_data = self.fetch_building_data(start_date, end_date)
-            if not raw_building_data:
-                logger.warning("No building data received from AGIR API.")
+            
+            raw_data = self.fetch_building_data(start_date, end_date)
+            if not raw_data:
+                logger.warning("No building data from API.")
                 return False
 
-            building_df = pd.DataFrame(raw_building_data)
-            
-            # Remove duplicates based on 'os' column
-            initial_rows = len(building_df)
+            building_df = pd.DataFrame(raw_data)
             building_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
-            final_rows = len(building_df)
-            if initial_rows > final_rows:
-                logger.info(f"Removed {initial_rows - final_rows} duplicate building 'os' records.")
-
-            # Clean and transform data (this will also sync companies)
-            cleaned_df = self.clean_and_transform_building_data(building_df)
-            success = self.insert_building_data_to_supabase(cleaned_df)
-            return success
             
+            cleaned_df = self.clean_and_transform_building_data(building_df)
+            return self.insert_building_data_to_supabase(cleaned_df)
         except Exception as e:
             logger.error(f"An error occurred in building data extraction: {e}", exc_info=True)
             return False
 
 
 def main():
-    """Main function to run both data extractions with multi-tenant support."""
-    # Clinical Engineering Data Extraction
+    """Main function to run both data extractions."""
     logger.info("Starting Multi-Tenant Clinical Engineering Data Extraction...")
     clinical_extractor = MultiTenantMaintenanceDataExtractor()
     clinical_success = clinical_extractor.extract_and_store_data(days_back=730)
     
     if clinical_success:
-        print("✅ Multi-tenant clinical engineering data extraction completed successfully!")
+        print("✅ Clinical engineering data extraction completed successfully!")
     else:
-        print("❌ Multi-tenant clinical engineering data extraction failed. Check logs.")
+        print("❌ Clinical engineering data extraction failed. Check logs.")
     
-    # Building Engineering Data Extraction
     logger.info("Starting Multi-Tenant Building Engineering Data Extraction...")
     building_extractor = MultiTenantBuildingEngineeringDataExtractor()
     building_success = building_extractor.extract_and_store_building_data(days_back=730)
     
     if building_success:
-        print("✅ Multi-tenant building engineering data extraction completed successfully!")
+        print("✅ Building engineering data extraction completed successfully!")
     else:
-        print("❌ Multi-tenant building engineering data extraction failed. Check logs.")
+        print("❌ Building engineering data extraction failed. Check logs.")
     
-    # Overall status
     if clinical_success and building_success:
-        print("🎉 All multi-tenant data extractions completed successfully!")
+        print("🎉 All data extractions completed successfully!")
     else:
-        print("⚠️ Some multi-tenant data extractions failed. Check logs for details.")
+        print("⚠️ Some data extractions failed. Check logs for details.")
 
 
 if __name__ == "__main__":
