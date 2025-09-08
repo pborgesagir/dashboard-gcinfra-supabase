@@ -5,18 +5,10 @@ import {
   Box, 
   Typography, 
   Grid, 
-  Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Card,
   CardContent,
   Alert,
   Chip,
-  OutlinedInput,
-  Checkbox,
-  ListItemText,
   SelectChangeEvent,
   Table,
   TableBody,
@@ -29,9 +21,12 @@ import {
   Button,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { ptBR } from 'date-fns/locale'
@@ -51,6 +46,8 @@ import CausaChart from './CausaChart'
 import FamiliaChart from './FamiliaChart'
 import TipoManutencaoChart from './TipoManutencaoChart'
 import SetorChart from './SetorChart'
+import TaxaCumprimentoPlanejadaChart from './TaxaCumprimentoPlanejadaChart'
+import FiltersSection from './FiltersSection'
 
 interface MaintenanceOrder {
   id: number
@@ -69,6 +66,7 @@ interface MaintenanceOrder {
   solicitante: string | null
   causa: string | null
   familia: string | null
+  tag: string | null
   custo_os: number | null
   custo_mo: number | null
   custo_peca: number | null
@@ -81,8 +79,9 @@ interface FilterState {
   aberturaEndDate: Date | null
   fechamentoStartDate: Date | null
   fechamentoEndDate: Date | null
-  empresa: string
-  equipamento: string
+  empresa: string[]
+  equipamento: string[]
+  familia: string[]
   prioridade: string[]
   setor: string[]
   tipomanutencao: string[]
@@ -103,8 +102,9 @@ export default function DashboardContent() {
     aberturaEndDate: null,
     fechamentoStartDate: null,
     fechamentoEndDate: null,
-    empresa: 'Todos',
-    equipamento: 'Todos',
+    empresa: [],
+    equipamento: [],
+    familia: [],
     prioridade: [],
     setor: [],
     tipomanutencao: [],
@@ -121,8 +121,9 @@ export default function DashboardContent() {
 
   // Get unique values for filter options
   const filterOptions = {
-    empresas: ['Todos', ...new Set(data.map(item => item.empresa).filter(Boolean))],
-    equipamentos: ['Todos', ...new Set(data.map(item => item.equipamento).filter(Boolean))],
+    empresas: [...new Set(data.map(item => item.empresa).filter(Boolean))],
+    equipamentos: [...new Set(data.map(item => item.equipamento).filter(Boolean))],
+    familias: [...new Set(data.map(item => item.familia).filter(Boolean))],
     prioridades: [...new Set(data.map(item => item.prioridade).filter(Boolean))],
     setores: [...new Set(data.map(item => item.setor).filter(Boolean))],
     tiposManutencao: [...new Set(data.map(item => item.tipomanutencao).filter(Boolean))],
@@ -223,16 +224,24 @@ export default function DashboardContent() {
       })
     }
 
-    // Single-choice filters
-    if (filters.empresa !== 'Todos') {
-      filtered = filtered.filter(item => item.empresa === filters.empresa)
-    }
-
-    if (filters.equipamento !== 'Todos') {
-      filtered = filtered.filter(item => item.equipamento === filters.equipamento)
-    }
-
     // Multiple-choice filters
+    if (filters.empresa.length > 0) {
+      filtered = filtered.filter(item => 
+        item.empresa && filters.empresa.includes(item.empresa)
+      )
+    }
+
+    if (filters.equipamento.length > 0) {
+      filtered = filtered.filter(item => 
+        item.equipamento && filters.equipamento.includes(item.equipamento)
+      )
+    }
+
+    if (filters.familia.length > 0) {
+      filtered = filtered.filter(item => 
+        item.familia && filters.familia.includes(item.familia)
+      )
+    }
     if (filters.prioridade.length > 0) {
       filtered = filtered.filter(item => 
         item.prioridade && filters.prioridade.includes(item.prioridade)
@@ -274,13 +283,13 @@ export default function DashboardContent() {
     setFilters(prev => ({ ...prev, [field]: date }))
   }
 
-  const handleSingleSelectChange = (field: 'empresa' | 'equipamento' | 'possuiChamado') => (
+  const handleSingleSelectChange = (field: 'possuiChamado') => (
     event: SelectChangeEvent<string>
   ) => {
     setFilters(prev => ({ ...prev, [field]: event.target.value }))
   }
 
-  const handleMultiSelectChange = (field: 'prioridade' | 'setor' | 'tipomanutencao' | 'situacao') => (
+  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'tipomanutencao' | 'situacao') => (
     event: SelectChangeEvent<string[]>
   ) => {
     const value = event.target.value
@@ -288,6 +297,23 @@ export default function DashboardContent() {
       ...prev,
       [field]: typeof value === 'string' ? value.split(',') : value
     }))
+  }
+
+  const clearFilters = () => {
+    setFilters({
+      aberturaStartDate: null,
+      aberturaEndDate: null,
+      fechamentoStartDate: null,
+      fechamentoEndDate: null,
+      empresa: [],
+      equipamento: [],
+      familia: [],
+      prioridade: [],
+      setor: [],
+      tipomanutencao: [],
+      situacao: [],
+      possuiChamado: 'Todos'
+    })
   }
 
   // Table handlers
@@ -373,6 +399,23 @@ export default function DashboardContent() {
   useEffect(() => {
     applyFilters()
   }, [applyFilters])
+
+  // Calculate data range from all data (not filtered)
+  const dataRange = React.useMemo(() => {
+    const dates = data
+      .map(order => order.abertura)
+      .filter(date => date)
+      .map(date => new Date(date!))
+      .sort((a, b) => a.getTime() - b.getTime())
+    
+    if (dates.length >= 2) {
+      return {
+        start: dates[0],
+        end: dates[dates.length - 1]
+      }
+    }
+    return null
+  }, [data])
 
   // Process filtered data for KPIs
   const kpiData = {
@@ -517,6 +560,74 @@ export default function DashboardContent() {
       const completionRate = (totalCompleted / totalPlanned) * 100
       
       return completionRate
+    })(),
+    taxaDisponibilidade: (() => {
+      // Step 1: Calculate TTP (Tempo Total Possível)
+      // Count distinct equipment based on "tag" column
+      const uniqueEquipment = new Set(
+        filteredData
+          .map(order => order.tag)
+          .filter(tag => tag && tag.trim() !== '')
+      )
+      const N = uniqueEquipment.size
+      
+      if (N === 0) return 0 // No equipment with tags identified
+      
+      // Step 2: Calculate H (Total hours in the selected period)
+      let H = 0
+      
+      // If abertura date filters are applied, calculate hours between them
+      if (filters.aberturaStartDate && filters.aberturaEndDate) {
+        const timeDiff = filters.aberturaEndDate.getTime() - filters.aberturaStartDate.getTime()
+        H = timeDiff / (1000 * 60 * 60) // Convert to hours
+      } else {
+        // If no date filters, calculate from data span
+        const dates = filteredData
+          .map(order => order.abertura)
+          .filter(date => date)
+          .map(date => new Date(date!))
+          .sort((a, b) => a.getTime() - b.getTime())
+        
+        if (dates.length >= 2) {
+          const firstDate = dates[0]
+          const lastDate = dates[dates.length - 1]
+          H = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60)
+        } else {
+          // Default to 1 year (8760 hours) if can't determine period
+          H = 8760
+        }
+      }
+      
+      // Step 3: Calculate TTP = N × H
+      const TTP = N * H
+      
+      // Step 4: Calculate TTI (Tempo Total Indisponível - Downtime)
+      // Filter for corrective maintenance orders with both data_chamado and fechamento
+      const correctiveOrders = filteredData.filter(order => 
+        order.tipomanutencao && 
+        order.tipomanutencao.toUpperCase() === 'CORRETIVA' &&
+        order.data_chamado &&
+        order.fechamento
+      )
+      
+      // Sum the duration of all corrective maintenance orders
+      const TTI = correctiveOrders.reduce((sum, order) => {
+        const chamadoDate = new Date(order.data_chamado!)
+        const fechamentoDate = new Date(order.fechamento!)
+        
+        // Calculate downtime: fechamento - data_chamado
+        const downtimeMs = fechamentoDate.getTime() - chamadoDate.getTime()
+        const downtimeHours = downtimeMs / (1000 * 60 * 60) // Convert to hours
+        
+        // Only include positive downtimes (fechamento after chamado)
+        return downtimeHours > 0 ? sum + downtimeHours : sum
+      }, 0)
+      
+      // Step 5: Calculate Taxa de Disponibilidade = (TTP - TTI) / TTP * 100
+      if (TTP === 0) return 0
+      const availability = ((TTP - TTI) / TTP) * 100
+      
+      return Math.max(0, Math.min(100, availability)) // Ensure between 0 and 100
     })()
   }
 
@@ -766,6 +877,117 @@ export default function DashboardContent() {
       .sort((a, b) => b.count - a.count)
   })()
 
+  // Process filtered data for taxa cumprimento planejada chart
+  const taxaCumprimentoPlanejadaData = (() => {
+    // Get all maintenance types from planned orders
+    const tiposManutencao = Array.from(new Set(
+      filteredData
+        .filter(order => order.causa && order.causa.toUpperCase() === 'PLANEJAMENTO')
+        .map(order => order.tipomanutencao || 'Não informado')
+    )).sort()
+
+    // Process monthly data
+    const monthlyData: Record<string, {
+      opened: Record<string, number>
+      closed: Record<string, number>
+    }> = {}
+
+    // Count opened planned orders by month and type
+    filteredData
+      .filter(order => 
+        order.causa && 
+        order.causa.toUpperCase() === 'PLANEJAMENTO' &&
+        order.abertura
+      )
+      .forEach(order => {
+        const date = new Date(order.abertura!)
+        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`
+        const tipo = order.tipomanutencao || 'Não informado'
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { opened: {}, closed: {} }
+        }
+        monthlyData[monthKey].opened[tipo] = (monthlyData[monthKey].opened[tipo] || 0) + 1
+      })
+
+    // Count closed planned orders by month and type
+    filteredData
+      .filter(order => 
+        order.causa && 
+        order.causa.toUpperCase() === 'PLANEJAMENTO' &&
+        order.fechamento
+      )
+      .forEach(order => {
+        const date = new Date(order.fechamento!)
+        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`
+        const tipo = order.tipomanutencao || 'Não informado'
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { opened: {}, closed: {} }
+        }
+        monthlyData[monthKey].closed[tipo] = (monthlyData[monthKey].closed[tipo] || 0) + 1
+      })
+
+    // Calculate rates for each month
+    const result = Object.entries(monthlyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-24) // Last 24 months
+      .map(([month, data]) => {
+        const [year, monthNum] = month.split('-')
+        const monthDisplay = `${monthNum}/${year.slice(-2)}`
+        
+        const monthResult: Record<string, string | number> = {
+          month,
+          monthDisplay
+        }
+
+        let totalOpened = 0
+        let totalClosed = 0
+
+        // Calculate rate for each maintenance type
+        tiposManutencao.forEach(tipo => {
+          const opened = data.opened[tipo] || 0
+          const closed = data.closed[tipo] || 0
+          const rate = opened > 0 ? (closed / opened) * 100 : 0
+          
+          monthResult[tipo] = rate
+          totalOpened += opened
+          totalClosed += closed
+        })
+
+        // Calculate overall average for this month
+        monthResult.media = totalOpened > 0 ? (totalClosed / totalOpened) * 100 : 0
+
+        return monthResult
+      })
+
+    return {
+      data: result,
+      tiposManutencao
+    }
+  })()
+
+  // Identify currently unavailable equipment (corrective maintenance in progress)
+  const equipamentosIndisponiveis = React.useMemo(() => {
+    return filteredData.filter(order => 
+      order.tipomanutencao && 
+      order.tipomanutencao.toUpperCase() === 'CORRETIVA' &&
+      order.data_chamado &&
+      !order.fechamento // Not closed yet - still in progress
+    ).map(order => ({
+      id: order.id,
+      equipamento: order.equipamento,
+      tag: order.tag,
+      setor: order.setor,
+      data_chamado: order.data_chamado,
+      responsavel: order.responsavel,
+      causa: order.causa,
+      prioridade: order.prioridade,
+      os: order.os,
+      empresa: order.empresa
+    }))
+  }, [filteredData])
+
   // Sort filtered data for table display
   const sortedData = React.useMemo(() => {
     const comparator = (a: MaintenanceOrder, b: MaintenanceOrder): number => {
@@ -815,205 +1037,15 @@ export default function DashboardContent() {
           </FormControl>
         </Box>
 
-        {/* Filtros */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            Filtros
-          </Typography>
-          
-          <Grid container spacing={3}>
-            {/* Filtros de Data de Abertura */}
-            <Grid item xs={12} sm={6} md={3}>
-              <DatePicker
-                label="Abertura - Data Inicial"
-                value={filters.aberturaStartDate}
-                onChange={handleDateChange('aberturaStartDate')}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <DatePicker
-                label="Abertura - Data Final"
-                value={filters.aberturaEndDate}
-                onChange={handleDateChange('aberturaEndDate')}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </Grid>
-
-            {/* Filtros de Data de Fechamento */}
-            <Grid item xs={12} sm={6} md={3}>
-              <DatePicker
-                label="Fechamento - Data Inicial"
-                value={filters.fechamentoStartDate}
-                onChange={handleDateChange('fechamentoStartDate')}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <DatePicker
-                label="Fechamento - Data Final"
-                value={filters.fechamentoEndDate}
-                onChange={handleDateChange('fechamentoEndDate')}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </Grid>
-
-            {/* Filtros de Seleção Única */}
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Empresa</InputLabel>
-                <Select
-                  value={filters.empresa}
-                  label="Empresa"
-                  onChange={handleSingleSelectChange('empresa')}
-                >
-                  {filterOptions.empresas.map((empresa) => (
-                    <MenuItem key={empresa} value={empresa}>
-                      {empresa}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Equipamento</InputLabel>
-                <Select
-                  value={filters.equipamento}
-                  label="Equipamento"
-                  onChange={handleSingleSelectChange('equipamento')}
-                >
-                  {filterOptions.equipamentos.map((equipamento) => (
-                    <MenuItem key={equipamento} value={equipamento}>
-                      {equipamento}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Filtros de Múltipla Escolha */}
-            <Grid item xs={12} sm={6} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Prioridade</InputLabel>
-                <Select
-                  multiple
-                  value={filters.prioridade}
-                  onChange={handleMultiSelectChange('prioridade')}
-                  input={<OutlinedInput label="Prioridade" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => (
-                        <Chip key={value} label={value} size="small" />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {filterOptions.prioridades.map((prioridade) => (
-                    <MenuItem key={prioridade} value={prioridade}>
-                      <Checkbox checked={filters.prioridade.indexOf(prioridade) > -1} />
-                      <ListItemText primary={prioridade} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Setor</InputLabel>
-                <Select
-                  multiple
-                  value={filters.setor}
-                  onChange={handleMultiSelectChange('setor')}
-                  input={<OutlinedInput label="Setor" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => (
-                        <Chip key={value} label={value} size="small" />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {filterOptions.setores.map((setor) => (
-                    <MenuItem key={setor} value={setor}>
-                      <Checkbox checked={filters.setor.indexOf(setor) > -1} />
-                      <ListItemText primary={setor} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Tipo de Manutenção</InputLabel>
-                <Select
-                  multiple
-                  value={filters.tipomanutencao}
-                  onChange={handleMultiSelectChange('tipomanutencao')}
-                  input={<OutlinedInput label="Tipo de Manutenção" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => (
-                        <Chip key={value} label={value} size="small" />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {filterOptions.tiposManutencao.map((tipo) => (
-                    <MenuItem key={tipo} value={tipo}>
-                      <Checkbox checked={filters.tipomanutencao.indexOf(tipo) > -1} />
-                      <ListItemText primary={tipo} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Situação</InputLabel>
-                <Select
-                  multiple
-                  value={filters.situacao}
-                  onChange={handleMultiSelectChange('situacao')}
-                  input={<OutlinedInput label="Situação" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => (
-                        <Chip key={value} label={value} size="small" />
-                      ))}
-                    </Box>
-                  )}
-                >
-                  {filterOptions.situacoes.map((situacao) => (
-                    <MenuItem key={situacao} value={situacao}>
-                      <Checkbox checked={filters.situacao.indexOf(situacao) > -1} />
-                      <ListItemText primary={situacao} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Possui Chamado</InputLabel>
-                <Select
-                  value={filters.possuiChamado}
-                  label="Possui Chamado"
-                  onChange={handleSingleSelectChange('possuiChamado')}
-                >
-                  <MenuItem value="Todos">Todos</MenuItem>
-                  <MenuItem value="Sim">Sim</MenuItem>
-                  <MenuItem value="Não">Não</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </Paper>
+        <FiltersSection
+          filters={filters}
+          filterOptions={filterOptions}
+          onDateChange={handleDateChange}
+          onSingleSelectChange={handleSingleSelectChange}
+          onMultiSelectChange={handleMultiSelectChange}
+          onClearFilters={clearFilters}
+          dataRange={dataRange}
+        />
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -1035,7 +1067,11 @@ export default function DashboardContent() {
 
       {/* KPI Metrics */}
       <Box mb={4}>
-        <KpiMetrics data={kpiData} loading={loading} />
+        <KpiMetrics 
+          data={kpiData} 
+          loading={loading} 
+          equipamentosIndisponiveis={equipamentosIndisponiveis}
+        />
       </Box>
 
       {/* Charts */}
@@ -1060,6 +1096,15 @@ export default function DashboardContent() {
       {/* Response Time Trend Chart */}
       <Box mb={4}>
         <ResponseTimeTrendChart data={responseTimeData} loading={loading} />
+      </Box>
+
+      {/* Taxa Cumprimento Planejada Chart */}
+      <Box mb={4}>
+        <TaxaCumprimentoPlanejadaChart 
+          data={taxaCumprimentoPlanejadaData.data} 
+          tiposManutencao={taxaCumprimentoPlanejadaData.tiposManutencao}
+          loading={loading} 
+        />
       </Box>
 
       {/* Analysis Charts */}

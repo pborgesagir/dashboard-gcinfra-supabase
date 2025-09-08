@@ -100,7 +100,6 @@ export default function TipoManutencaoChart({ data, loading, chartType = 'bar' }
         <YAxis 
           tickFormatter={(value) => value.toLocaleString('pt-BR')}
           fontSize={12}
-          label={{ value: 'Quantidade de OS', angle: -90, position: 'insideLeft' }}
         />
         <Tooltip
           formatter={formatTooltip}
@@ -113,12 +112,12 @@ export default function TipoManutencaoChart({ data, loading, chartType = 'bar' }
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px' }}
+          hide
         />
         
         <Bar
           dataKey="count"
           fill="#ff9800"
-          name="count"
           radius={[4, 4, 0, 0]}
           onMouseEnter={(_, index) => setActiveIndex(index)}
           onMouseLeave={() => setActiveIndex(-1)}

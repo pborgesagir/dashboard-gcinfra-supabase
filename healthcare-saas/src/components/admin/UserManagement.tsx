@@ -80,7 +80,7 @@ export default function UserManagement() {
       setUsers(data || [])
     } catch (error) {
       console.error('Error fetching users:', error)
-      setError('Failed to load users')
+      setError('Falha ao carregar usuários')
     }
   }
 
@@ -124,7 +124,8 @@ export default function UserManagement() {
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 7) // Expires in 7 days
 
-      const { error } = await supabase
+      // Insert invitation in database
+      const { error: dbError } = await supabase
         .from('user_invitations')
         .insert({
           email: inviteForm.email,
@@ -134,14 +135,33 @@ export default function UserManagement() {
           expires_at: expiresAt.toISOString()
         })
 
-      if (error) throw error
+      if (dbError) throw dbError
 
-      setSuccess('Invitation sent successfully!')
+      // Send email via API
+      const response = await fetch('/api/invitations/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteForm.email,
+          role: inviteForm.role,
+          companyId: inviteForm.role === 'admin' ? null : inviteForm.companyId,
+          token
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Falha ao enviar e-mail')
+      }
+
+      setSuccess('Convite enviado com sucesso!')
       setInviteDialogOpen(false)
       setInviteForm({ email: '', role: 'manager', companyId: '' })
       fetchInvitations()
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Failed to send invitation')
+      setError(error instanceof Error ? error.message : 'Falha ao enviar convite')
     } finally {
       setLoading(false)
     }
@@ -165,19 +185,19 @@ export default function UserManagement() {
 
       if (error) throw error
 
-      setSuccess('User updated successfully!')
+      setSuccess('Usuário atualizado com sucesso!')
       setEditDialogOpen(false)
       setSelectedUser(null)
       fetchUsers()
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Failed to update user')
+      setError(error instanceof Error ? error.message : 'Falha ao atualizar usuário')
     } finally {
       setLoading(false)
     }
   }
 
   const deleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return
+    if (!confirm('Tem certeza que deseja excluir este usuário?')) return
 
     try {
       setLoading(true)
@@ -188,10 +208,10 @@ export default function UserManagement() {
 
       if (error) throw error
 
-      setSuccess('User deleted successfully!')
+      setSuccess('Usuário excluído com sucesso!')
       fetchUsers()
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Failed to delete user')
+      setError(error instanceof Error ? error.message : 'Falha ao excluir usuário')
     } finally {
       setLoading(false)
     }
@@ -221,7 +241,7 @@ export default function UserManagement() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">User Management</Typography>
+        <Typography variant="h4">Gerenciar Usuários</Typography>
         <Box gap={2} display="flex">
           <Button
             variant="outlined"
@@ -232,14 +252,14 @@ export default function UserManagement() {
               fetchInvitations()
             }}
           >
-            Refresh
+            ATUALIZAR
           </Button>
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => setInviteDialogOpen(true)}
           >
-            Invite User
+            CONVIDAR
           </Button>
         </Box>
       </Box>
@@ -261,16 +281,16 @@ export default function UserManagement() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Pending Invitations ({invitations.length})
+              Convites Pendentes ({invitations.length})
             </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>Email</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Company</TableCell>
-                    <TableCell>Expires</TableCell>
+                    <TableCell>Perfil</TableCell>
+                    <TableCell>Empresa</TableCell>
+                    <TableCell>Expira em</TableCell>
                     <TableCell>Status</TableCell>
                   </TableRow>
                 </TableHead>
@@ -295,7 +315,7 @@ export default function UserManagement() {
                         {new Date(invitation.expires_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <Chip label={invitation.status} size="small" color="warning" />
+                        <Chip label={invitation.status === 'pending' ? 'Pendente' : invitation.status} size="small" color="warning" />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -310,18 +330,18 @@ export default function UserManagement() {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Users ({users.length})
+            Usuários ({users.length})
           </Typography>
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
                 <TableRow>
                   <TableCell>Email</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>Company</TableCell>
+                  <TableCell>Perfil</TableCell>
+                  <TableCell>Empresa</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Actions</TableCell>
+                  <TableCell>Criado em</TableCell>
+                  <TableCell>Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -340,7 +360,7 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <Chip 
-                        label={user.is_active ? 'Active' : 'Inactive'} 
+                        label={user.is_active ? 'Ativo' : 'Inativo'} 
                         size="small" 
                         color={user.is_active ? 'success' : 'default'}
                       />
@@ -376,7 +396,7 @@ export default function UserManagement() {
 
       {/* Invite User Dialog */}
       <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Invite New User</DialogTitle>
+        <DialogTitle>Convidar Novo Usuário</DialogTitle>
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} pt={2}>
             <TextField
@@ -395,12 +415,12 @@ export default function UserManagement() {
               fullWidth
             >
               <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="manager">Manager</MenuItem>
+              <MenuItem value="manager">Gerente</MenuItem>
             </TextField>
             {inviteForm.role === 'manager' && (
               <TextField
                 select
-                label="Company"
+                label="Empresa"
                 value={inviteForm.companyId}
                 onChange={(e) => setInviteForm({ ...inviteForm, companyId: e.target.value })}
                 fullWidth
@@ -416,21 +436,21 @@ export default function UserManagement() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setInviteDialogOpen(false)}>Cancelar</Button>
           <Button 
             onClick={sendInvitation} 
             variant="contained" 
             startIcon={<Send />}
             disabled={!inviteForm.email || (inviteForm.role === 'manager' && !inviteForm.companyId)}
           >
-            Send Invitation
+            Enviar Convite
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit User</DialogTitle>
+        <DialogTitle>Editar Usuário</DialogTitle>
         <DialogContent>
           {selectedUser && (
             <Box display="flex" flexDirection="column" gap={2} pt={2}>
@@ -452,12 +472,12 @@ export default function UserManagement() {
                 fullWidth
               >
                 <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="manager">Manager</MenuItem>
+                <MenuItem value="manager">Gerente</MenuItem>
               </TextField>
               {selectedUser.role === 'manager' && (
                 <TextField
                   select
-                  label="Company"
+                  label="Empresa"
                   value={selectedUser.company_id || ''}
                   onChange={(e) => setSelectedUser({
                     ...selectedUser,
@@ -483,16 +503,16 @@ export default function UserManagement() {
                 })}
                 fullWidth
               >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
+                <MenuItem value="active">Ativo</MenuItem>
+                <MenuItem value="inactive">Inativo</MenuItem>
               </TextField>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
           <Button onClick={updateUser} variant="contained">
-            Update User
+            Atualizar Usuário
           </Button>
         </DialogActions>
       </Dialog>

@@ -31,8 +31,11 @@ import {
   ExitToApp,
   MedicalServices,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  HourglassEmpty,
+  Psychology
 } from '@mui/icons-material'
+import Image from 'next/image'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
 interface AppLayoutProps {
@@ -92,7 +95,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     },
     {
       text: 'Análises',
-      icon: <Analytics />,
+      icon: <Psychology />,
       path: isAdmin ? '/admin/analytics' : '/analytics',
       show: true
     },
@@ -109,9 +112,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       show: isAdmin
     },
     {
-      text: 'Configurações',
-      icon: <Settings />,
-      path: '/settings',
+      text: 'SMO',
+      icon: <HourglassEmpty />,
+      path: '/smo',
       show: true
     }
   ]
@@ -119,14 +122,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const drawer = (
     <Box>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-        <MedicalServices sx={{ color: 'primary.main' }} />
+        <Image 
+          src="/logodaagir.png" 
+          alt="360° - GCINFRA Logo" 
+          width={40} 
+          height={40}
+          style={{ objectFit: 'contain' }}
+        />
         {sidebarOpen && (
           <Box>
             <Typography variant="h6" noWrap>
-              Healthcare SaaS
+              360° - GCINFRA
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Gerenciamento de Infraestrutura
+              Gestão de Infraestrutura
             </Typography>
           </Box>
         )}
@@ -248,11 +257,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               onClose={handleClose}
             >
               <MenuItem onClick={() => { router.push('/profile'); handleClose(); }}>
-                Profile
+                Perfil
               </MenuItem>
               <MenuItem onClick={handleSignOut}>
                 <ExitToApp sx={{ mr: 1 }} />
-                Sign Out
+                Sair
               </MenuItem>
             </Menu>
           </div>

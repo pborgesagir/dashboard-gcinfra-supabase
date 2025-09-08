@@ -7,8 +7,13 @@ import ThemeProvider from '@/components/providers/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Healthcare SaaS - Infrastructure Management',
-  description: 'Professional healthcare infrastructure management platform',
+  title: '360° - GCINFRA',
+  description: 'Plataforma profissional de gestão de infraestrutura',
+  icons: {
+    icon: '/logodaagir.png',
+    shortcut: '/logodaagir.png',
+    apple: '/logodaagir.png',
+  },
 }
 
 export default function RootLayout({
@@ -17,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <body className={inter.className}>
         <ThemeProvider>
           <AuthProvider>
