@@ -33,7 +33,7 @@ import {
   TableChart as TableChartIcon
 } from '@mui/icons-material'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase/client'
+import { useData, MaintenanceOrder } from '@/contexts/DataContext'
 import KpiMetrics from './KpiMetrics'
 import MaintenanceChart from './MaintenanceChart'
 import HeatmapChart from './HeatmapChart'
@@ -46,30 +46,6 @@ import SetorChart from './SetorChart'
 import TaxaCumprimentoPlanejadaChart from './TaxaCumprimentoPlanejadaChart'
 import FiltersSection from './FiltersSection'
 
-interface MaintenanceOrder {
-  id: number
-  empresa: string | null
-  os: string | null
-  equipamento: string | null
-  situacao: string | null
-  abertura: string | null
-  fechamento: string | null
-  prioridade: string | null
-  setor: string | null
-  tipomanutencao: string | null
-  data_chamado: string | null
-  data_atendimento: string | null
-  responsavel: string | null
-  solicitante: string | null
-  causa: string | null
-  familia: string | null
-  tag: string | null
-  custo_os: number | null
-  custo_mo: number | null
-  custo_peca: number | null
-  custo_servicoexterno: number | null
-  company_id: string | null
-}
 
 interface FilterState {
   aberturaStartDate: Date | null
@@ -88,11 +64,15 @@ interface FilterState {
 
 export default function BuildingDashboardContent() {
   const { userProfile, isAdmin } = useAuth()
-  const [data, setData] = useState<MaintenanceOrder[]>([])
+  const {
+    buildingData,
+    buildingLoading,
+    buildingError,
+    loadingProgress,
+    loadBuildingData
+  } = useData()
+  
   const [filteredData, setFilteredData] = useState<MaintenanceOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingProgress, setLoadingProgress] = useState<string>('')
-  const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<FilterState>({
     aberturaStartDate: null,
     aberturaEndDate: null,
@@ -117,79 +97,23 @@ export default function BuildingDashboardContent() {
 
   // Get unique values for filter options
   const filterOptions = {
-    empresas: [...new Set(data.map(item => item.empresa).filter(Boolean))],
-    equipamentos: [...new Set(data.map(item => item.equipamento).filter(Boolean))],
-    familias: [...new Set(data.map(item => item.familia).filter(Boolean))],
-    prioridades: [...new Set(data.map(item => item.prioridade).filter(Boolean))],
-    setores: [...new Set(data.map(item => item.setor).filter(Boolean))],
-    tiposManutencao: [...new Set(data.map(item => item.tipomanutencao).filter(Boolean))],
-    situacoes: [...new Set(data.map(item => item.situacao).filter(Boolean))]
+    empresas: [...new Set(buildingData.map(item => item.empresa).filter(Boolean))] as string[],
+    equipamentos: [...new Set(buildingData.map(item => item.equipamento).filter(Boolean))] as string[],
+    familias: [...new Set(buildingData.map(item => item.familia).filter(Boolean))] as string[],
+    prioridades: [...new Set(buildingData.map(item => item.prioridade).filter(Boolean))] as string[],
+    setores: [...new Set(buildingData.map(item => item.setor).filter(Boolean))] as string[],
+    tiposManutencao: [...new Set(buildingData.map(item => item.tipomanutencao).filter(Boolean))] as string[],
+    situacoes: [...new Set(buildingData.map(item => item.situacao).filter(Boolean))] as string[]
   }
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const tableName = 'building_orders'
-      
-      let query = supabase
-        .from(tableName)
-        .select('*')
-        .order('abertura', { ascending: false })
-
-      // Apply company filter for managers
-      if (!isAdmin && userProfile?.company_id) {
-        query = query.eq('company_id', userProfile.company_id)
-      }
-
-      // Fetch all data by implementing pagination
-      let allOrders: MaintenanceOrder[] = []
-      let from = 0
-      const batchSize = 1000
-      let hasMore = true
-
-      setLoadingProgress('Carregando dados...')
-
-      while (hasMore) {
-        setLoadingProgress(`Carregando ${allOrders.length.toLocaleString()} registros...`)
-        
-        const { data: batch, error } = await query
-          .range(from, from + batchSize - 1)
-          
-        if (error) throw error
-        
-        if (batch && batch.length > 0) {
-          allOrders = allOrders.concat(batch)
-          from += batchSize
-          hasMore = batch.length === batchSize
-          
-          if (allOrders.length > 10000) {
-            await new Promise(resolve => setTimeout(resolve, 10))
-          }
-        } else {
-          hasMore = false
-        }
-      }
-
-      setLoadingProgress(`Carregados ${allOrders.length.toLocaleString()} registros!`)
-
-      const orders = allOrders
-
-      setData(orders || [])
-      setFilteredData(orders || [])
-    } catch (error: unknown) {
-      console.error('Error fetching data:', error)
-      setError(error instanceof Error ? error.message : 'Failed to load data')
-    } finally {
-      setLoading(false)
-      setLoadingProgress('')
-    }
-  }, [userProfile, isAdmin])
+  // Load building data when component mounts
+  useEffect(() => {
+    loadBuildingData().catch(console.error)
+  }, [loadBuildingData])
 
   // Apply all filters to the data (same logic as clinical)
   const applyFilters = useCallback(() => {
-    let filtered = [...data]
+    let filtered = [...buildingData]
 
     // Date range filter
     if (filters.aberturaStartDate || filters.aberturaEndDate) {
@@ -268,7 +192,7 @@ export default function BuildingDashboardContent() {
     }
 
     setFilteredData(filtered)
-  }, [data, filters])
+  }, [buildingData, filters])
 
   // Filter change handlers
   const handleDateChange = (field: 'aberturaStartDate' | 'aberturaEndDate' | 'fechamentoStartDate' | 'fechamentoEndDate') => (date: Date | null) => {
@@ -328,7 +252,7 @@ export default function BuildingDashboardContent() {
     if (value === null || value === undefined || value === '') return '-'
     
     if (['abertura', 'fechamento', 'data_atendimento', 'data_chamado', 'data_solucao'].includes(column)) {
-      return new Date(value).toLocaleString('pt-BR')
+      return new Date(value as string | number | Date).toLocaleString('pt-BR')
     }
     
     if (['custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno'].includes(column)) {
@@ -384,9 +308,6 @@ export default function BuildingDashboardContent() {
     document.body.removeChild(link)
   }
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
 
   useEffect(() => {
     applyFilters()
@@ -394,7 +315,7 @@ export default function BuildingDashboardContent() {
 
   // Calculate data range from all data (not filtered)
   const dataRange = React.useMemo(() => {
-    const dates = data
+    const dates = buildingData
       .map(order => order.abertura)
       .filter(date => date)
       .map(date => new Date(date!))
@@ -407,7 +328,7 @@ export default function BuildingDashboardContent() {
       }
     }
     return null
-  }, [data])
+  }, [buildingData])
 
   // Process filtered data for KPIs - Same logic as clinical
   const kpiData = {
@@ -980,13 +901,13 @@ export default function BuildingDashboardContent() {
           dataRange={dataRange}
         />
 
-      {error && (
+      {buildingError && (
         <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
+          {buildingError}
         </Alert>
       )}
 
-      {loading && loadingProgress && (
+      {buildingLoading && loadingProgress && (
         <Alert 
           severity="info" 
           sx={{ 
@@ -1022,7 +943,7 @@ export default function BuildingDashboardContent() {
       <Box mb={4}>
         <KpiMetrics 
           data={kpiData} 
-          loading={loading} 
+          loading={buildingLoading} 
           equipamentosIndisponiveis={equipamentosIndisponiveis}
         />
       </Box>
@@ -1032,59 +953,60 @@ export default function BuildingDashboardContent() {
         <MaintenanceChart 
           timeSeriesData={timeSeriesData}
           statusData={statusData}
-          loading={loading}
+          loading={buildingLoading}
         />
       </Box>
 
       {/* Heatmap */}
       <Box mb={4}>
-        <HeatmapChart data={heatmapData} loading={loading} />
+        <HeatmapChart data={heatmapData} loading={buildingLoading} />
       </Box>
 
       {/* Work Order Trend Chart */}
       <Box mb={4}>
-        <WorkOrderTrendChart data={workOrderTrendData} loading={loading} />
+        <WorkOrderTrendChart data={workOrderTrendData} loading={buildingLoading} />
       </Box>
 
       {/* Response Time Trend Chart */}
       <Box mb={4}>
-        <ResponseTimeTrendChart data={responseTimeData} loading={loading} />
+        <ResponseTimeTrendChart data={responseTimeData} loading={buildingLoading} />
       </Box>
 
       {/* Taxa Cumprimento Planejada Chart */}
       <Box mb={4}>
         <TaxaCumprimentoPlanejadaChart 
-          data={taxaCumprimentoPlanejadaData.data} 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data={taxaCumprimentoPlanejadaData.data as any} 
           tiposManutencao={taxaCumprimentoPlanejadaData.tiposManutencao}
-          loading={loading} 
+          loading={buildingLoading} 
         />
       </Box>
 
       {/* Analysis Charts */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} lg={6}>
-          <CausaChart data={causaData} loading={loading} />
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <CausaChart data={causaData} loading={buildingLoading} />
         </Grid>
-        <Grid item xs={12} lg={6}>
-          <FamiliaChart data={familiaData} loading={loading} />
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <FamiliaChart data={familiaData} loading={buildingLoading} />
         </Grid>
-        <Grid item xs={12} lg={6}>
-          <TipoManutencaoChart data={tipoManutencaoData} loading={loading} />
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <TipoManutencaoChart data={tipoManutencaoData} loading={buildingLoading} />
         </Grid>
-        <Grid item xs={12} lg={6}>
-          <SetorChart data={setorData} loading={loading} />
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <SetorChart data={setorData} loading={buildingLoading} />
         </Grid>
       </Grid>
 
       {/* Data Summary */}
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 Top 10 Equipamentos por Quantidade de OS
               </Typography>
-              {loading ? (
+              {buildingLoading ? (
                 <Typography color="text.secondary">Carregando...</Typography>
               ) : (
                 <Box>
@@ -1113,13 +1035,13 @@ export default function BuildingDashboardContent() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 Distribuição por Prioridade
               </Typography>
-              {loading ? (
+              {buildingLoading ? (
                 <Typography color="text.secondary">Carregando...</Typography>
               ) : (
                 <Box>

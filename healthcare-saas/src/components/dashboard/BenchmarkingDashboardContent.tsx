@@ -25,37 +25,18 @@ import {
   Download as DownloadIcon
 } from '@mui/icons-material'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase/client'
+import { useData, MaintenanceOrder } from '@/contexts/DataContext'
 import FiltersSection from './FiltersSection'
 import EquipmentCountByCompanyChart from './EquipmentCountByCompanyChart'
 import CompanyStatusGauges from './CompanyStatusGauges'
 import CompanyTrendChart from './CompanyTrendChart'
 import MTBFBenchmarkingChart from './MTBFBenchmarkingChart'
 
-interface MaintenanceOrder {
-  id: number
-  empresa: string | null
-  os: string | null
-  equipamento: string | null
-  situacao: string | null
-  abertura: string | null
-  fechamento: string | null
-  prioridade: string | null
-  setor: string | null
-  tipomanutencao: string | null
-  data_chamado: string | null
-  data_atendimento: string | null
-  responsavel: string | null
-  solicitante: string | null
-  causa: string | null
-  familia: string | null
-  tag: string | null
-  custo_os: number | null
-  custo_mo: number | null
-  custo_peca: number | null
-  custo_servicoexterno: number | null
-  company_id: string | null
+interface CompanyTrendData extends Record<string, string | number> {
+  month: string
+  monthDisplay: string
 }
+
 
 interface FilterState {
   aberturaStartDate: Date | null
@@ -74,13 +55,20 @@ interface FilterState {
 
 export default function BenchmarkingDashboardContent() {
   const { userProfile, isAdmin } = useAuth()
-  const [clinicalData, setClinicalData] = useState<MaintenanceOrder[]>([])
-  const [buildingData, setBuildingData] = useState<MaintenanceOrder[]>([])
+  const {
+    clinicalData,
+    buildingData,
+    clinicalLoading,
+    buildingLoading,
+    clinicalError,
+    buildingError,
+    loadingProgress,
+    loadClinicalData,
+    loadBuildingData
+  } = useData()
+  
   const [allData, setAllData] = useState<MaintenanceOrder[]>([])
   const [filteredData, setFilteredData] = useState<MaintenanceOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingProgress, setLoadingProgress] = useState<string>('')
-  const [error, setError] = useState<string | null>(null)
   const [dataType, setDataType] = useState<'clinical' | 'building'>('clinical')
   const [filters, setFilters] = useState<FilterState>({
     aberturaStartDate: null,
@@ -108,115 +96,24 @@ export default function BenchmarkingDashboardContent() {
     situacoes: [...new Set(allData.map(item => item.situacao).filter(Boolean))] as string[]
   }
 
-  const fetchData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
-      setLoadingProgress('Carregando dados...')
-
-      // Fetch both clinical and building data
-      const [clinicalResult, buildingResult] = await Promise.all([
-        // Clinical data
-        (async () => {
-          let query = supabase
-            .from('maintenance_orders')
-            .select('*')
-            .order('abertura', { ascending: false })
-
-          if (!isAdmin && userProfile?.company_id) {
-            query = query.eq('company_id', userProfile.company_id)
-          }
-
-          let allOrders: MaintenanceOrder[] = []
-          let from = 0
-          const batchSize = 1000
-          let hasMore = true
-
-          while (hasMore) {
-            setLoadingProgress(`Carregando dados clínicos: ${allOrders.length.toLocaleString()} registros...`)
-            
-            const { data: batch, error } = await query.range(from, from + batchSize - 1)
-            if (error) throw error
-            
-            if (batch && batch.length > 0) {
-              allOrders = allOrders.concat(batch)
-              from += batchSize
-              hasMore = batch.length === batchSize
-              
-              if (allOrders.length > 10000) {
-                await new Promise(resolve => setTimeout(resolve, 10))
-              }
-            } else {
-              hasMore = false
-            }
-          }
-
-          return allOrders
-        })(),
-        // Building data
-        (async () => {
-          let query = supabase
-            .from('building_orders')
-            .select('*')
-            .order('abertura', { ascending: false })
-
-          if (!isAdmin && userProfile?.company_id) {
-            query = query.eq('company_id', userProfile.company_id)
-          }
-
-          let allOrders: MaintenanceOrder[] = []
-          let from = 0
-          const batchSize = 1000
-          let hasMore = true
-
-          while (hasMore) {
-            setLoadingProgress(`Carregando dados prediais: ${allOrders.length.toLocaleString()} registros...`)
-            
-            const { data: batch, error } = await query.range(from, from + batchSize - 1)
-            if (error) throw error
-            
-            if (batch && batch.length > 0) {
-              allOrders = allOrders.concat(batch)
-              from += batchSize
-              hasMore = batch.length === batchSize
-              
-              if (allOrders.length > 10000) {
-                await new Promise(resolve => setTimeout(resolve, 10))
-              }
-            } else {
-              hasMore = false
-            }
-          }
-
-          return allOrders
-        })()
-      ])
-
-      setClinicalData(clinicalResult)
-      setBuildingData(buildingResult)
-      
-      // Set initial data based on dataType
-      const initialData = dataType === 'clinical' ? clinicalResult : buildingResult
-      setAllData(initialData)
-      setFilteredData(initialData)
-
-      setLoadingProgress(`Carregados ${clinicalResult.length + buildingResult.length} registros no total!`)
-    } catch (error: unknown) {
-      console.error('Error fetching data:', error)
-      setError(error instanceof Error ? error.message : 'Failed to load data')
-    } finally {
-      setLoading(false)
-      setLoadingProgress('')
+      // Load data based on the current dataType
+      if (dataType === 'clinical') {
+        await loadClinicalData()
+      } else {
+        await loadBuildingData()
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
     }
-  }, [userProfile, isAdmin, dataType])
+  }, [dataType, loadClinicalData, loadBuildingData])
 
-  // Update data when dataType changes
+  // Update data when dataType changes or when data is loaded
   useEffect(() => {
-    if (clinicalData.length > 0 || buildingData.length > 0) {
-      const newData = dataType === 'clinical' ? clinicalData : buildingData
-      setAllData(newData)
-      setFilteredData(newData)
-    }
+    const newData = dataType === 'clinical' ? clinicalData : buildingData
+    setAllData(newData)
+    setFilteredData(newData)
   }, [dataType, clinicalData, buildingData])
 
   // Apply all filters to the data
@@ -384,9 +281,10 @@ export default function BenchmarkingDashboardContent() {
     document.body.removeChild(link)
   }
 
+  // Load data when component mounts or dataType changes
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    loadData()
+  }, [loadData])
 
   useEffect(() => {
     applyFilters()
@@ -496,7 +394,7 @@ export default function BenchmarkingDashboardContent() {
     }).slice(-24)
 
     const trendData = sortedMonths.map(month => {
-      const monthData: Record<string, string | number> = { month, monthDisplay: month }
+      const monthData: CompanyTrendData = { month, monthDisplay: month }
       Array.from(companies).forEach(company => {
         monthData[company] = monthlyData[month]?.[company] || 0
       })
@@ -561,7 +459,7 @@ export default function BenchmarkingDashboardContent() {
     }).slice(-24)
 
     const trendData = sortedMonths.map(month => {
-      const monthData: Record<string, string | number> = { month, monthDisplay: month }
+      const monthData: CompanyTrendData = { month, monthDisplay: month }
       Array.from(companies).forEach(company => {
         const companyData = monthlyData[month]?.[company] || { opened: 0, closed: 0 }
         monthData[company] = companyData.opened > 0 ? (companyData.closed / companyData.opened) * 100 : 0
@@ -613,7 +511,7 @@ export default function BenchmarkingDashboardContent() {
     }).slice(-24)
 
     const trendData = sortedMonths.map(month => {
-      const monthData: Record<string, string | number> = { month, monthDisplay: month }
+      const monthData: CompanyTrendData = { month, monthDisplay: month }
       Array.from(companies).forEach(company => {
         const companyData = monthlyData[month]?.[company]
         monthData[company] = companyData && companyData.count > 0 ? companyData.totalTime / companyData.count : 0
@@ -670,7 +568,7 @@ export default function BenchmarkingDashboardContent() {
     }).slice(-24)
 
     const trendData = sortedMonths.map(month => {
-      const monthData: Record<string, string | number> = { month, monthDisplay: month }
+      const monthData: CompanyTrendData = { month, monthDisplay: month }
       Array.from(companies).forEach(company => {
         const companyData = monthlyData[month]?.[company]
         monthData[company] = companyData && companyData.count > 0 ? companyData.totalTime / companyData.count : 0
@@ -836,13 +734,13 @@ export default function BenchmarkingDashboardContent() {
           dataRange={dataRange}
         />
 
-        {error && (
+        {(clinicalError || buildingError) && (
           <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
+            {dataType === 'clinical' ? clinicalError : buildingError}
           </Alert>
         )}
 
-        {loading && loadingProgress && (
+        {(clinicalLoading || buildingLoading) && loadingProgress && (
           <Alert 
             severity="info" 
             sx={{ 
@@ -879,13 +777,13 @@ export default function BenchmarkingDashboardContent() {
           <Grid size={{ xs: 12, md: 6 }}>
             <EquipmentCountByCompanyChart 
               data={equipmentCountData}
-              loading={loading}
+              loading={clinicalLoading || buildingLoading}
             />
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <CompanyStatusGauges 
               data={companyStatusData}
-              loading={loading}
+              loading={clinicalLoading || buildingLoading}
             />
           </Grid>
         </Grid>
@@ -893,9 +791,9 @@ export default function BenchmarkingDashboardContent() {
         {/* OS Trend Chart */}
         <Box mb={4}>
           <CompanyTrendChart
-            data={osTrendData.data as any}
+            data={osTrendData.data}
             companies={osTrendData.companies}
-            loading={loading}
+            loading={clinicalLoading || buildingLoading}
             title="Tendência da Quantidade de OS ao Longo do Tempo"
             yAxisTitle="Quantidade de OS"
           />
@@ -904,9 +802,9 @@ export default function BenchmarkingDashboardContent() {
         {/* Planned Completion Rate Trend */}
         <Box mb={4}>
           <CompanyTrendChart
-            data={plannedCompletionTrendData.data as any}
+            data={plannedCompletionTrendData.data}
             companies={plannedCompletionTrendData.companies}
-            loading={loading}
+            loading={clinicalLoading || buildingLoading}
             title="Taxa Mensal de Cumprimento de OS Planejadas"
             yAxisTitle="Taxa de Cumprimento (%)"
             showAverage={true}
@@ -916,9 +814,9 @@ export default function BenchmarkingDashboardContent() {
         {/* First Response Time Trend */}
         <Box mb={4}>
           <CompanyTrendChart
-            data={firstResponseTrendData.data as any}
+            data={firstResponseTrendData.data}
             companies={firstResponseTrendData.companies}
-            loading={loading}
+            loading={clinicalLoading || buildingLoading}
             title="Tendência do Tempo Médio de Primeira Resposta"
             yAxisTitle="Tempo de Resposta (horas)"
             showAverage={true}
@@ -928,9 +826,9 @@ export default function BenchmarkingDashboardContent() {
         {/* MTTR Trend */}
         <Box mb={4}>
           <CompanyTrendChart
-            data={mttrTrendData.data as any}
+            data={mttrTrendData.data}
             companies={mttrTrendData.companies}
-            loading={loading}
+            loading={clinicalLoading || buildingLoading}
             title="MTTR - Tempo Médio de Reparo"
             yAxisTitle="MTTR (horas)"
             showAverage={true}
@@ -941,7 +839,7 @@ export default function BenchmarkingDashboardContent() {
         <Box mb={4}>
           <MTBFBenchmarkingChart 
             data={mtbfBenchmarkingData}
-            loading={loading}
+            loading={clinicalLoading || buildingLoading}
           />
         </Box>
 

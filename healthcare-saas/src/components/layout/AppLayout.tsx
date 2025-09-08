@@ -3,6 +3,7 @@
 import { useState, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { DataProvider } from '@/contexts/DataContext'
 import {
   AppBar,
   Toolbar,
@@ -195,8 +196,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   )
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <AppBar
+    <DataProvider>
+      <Box sx={{ display: 'flex' }}>
+        <AppBar
         position="fixed"
         sx={{
           width: { sm: sidebarOpen ? `calc(100% - ${drawerWidth}px)` : `calc(100% - 72px)` },
@@ -322,8 +324,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
           mt: 8
         }}
       >
-        {children}
+          {children}
+        </Box>
       </Box>
-    </Box>
+    </DataProvider>
   )
 }

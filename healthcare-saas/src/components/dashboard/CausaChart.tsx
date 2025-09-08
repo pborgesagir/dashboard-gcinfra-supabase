@@ -107,7 +107,7 @@ export default function CausaChart({ data, loading, chartType = 'bar' }: CausaCh
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px' }}
-          hide
+          content={() => null}
         />
         
         <Bar
