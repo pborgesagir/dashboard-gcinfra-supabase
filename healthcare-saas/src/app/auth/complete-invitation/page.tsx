@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useEffect,
-  useCallback,
-  ChangeEvent,
-  FormEvent,
-} from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Box,
@@ -22,22 +16,8 @@ import {
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
 
-// 1. Interface para tipar os dados do convite
-interface Invitation {
-  id: string;
-  email: string;
-  role: "admin" | "manager";
-  company_id: string;
-  expires_at: string;
-  status: "pending" | "accepted" | "expired";
-  companies: {
-    name: string;
-    acronym: string;
-  } | null;
-}
-
 export default function CompleteInvitationPage() {
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [invitation, setInvitation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +33,16 @@ export default function CompleteInvitationPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
-  // 2. Função otimizada com useCallback
-  const validateToken = useCallback(async () => {
-    if (!token) return;
+  useEffect(() => {
+    if (token) {
+      validateToken();
+    } else {
+      setError("Token de convite não fornecido");
+      setLoading(false);
+    }
+  }, [token]);
 
+  const validateToken = async () => {
     try {
       const { data, error } = await supabase
         .from("user_invitations")
@@ -71,50 +57,30 @@ export default function CompleteInvitationPage() {
         )
         .eq("token", token)
         .eq("status", "pending")
-        .single<Invitation>();
+        .single();
 
       if (error || !data) {
         setError("Convite inválido ou expirado");
         return;
       }
 
+      // Verificar se o convite não expirou
       if (new Date(data.expires_at) < new Date()) {
         setError("Convite expirado");
         return;
       }
 
       setInvitation(data);
-    } catch (err) {
-      console.error("Erro ao validar token:", err);
+    } catch (error) {
+      console.error("Erro ao validar token:", error);
       setError("Erro ao validar convite");
     } finally {
       setLoading(false);
     }
-  }, [token]);
-
-  // 3. useEffect com dependência correta
-  useEffect(() => {
-    if (token) {
-      validateToken();
-    } else {
-      setError("Token de convite não fornecido");
-      setLoading(false);
-    }
-  }, [token, validateToken]);
-
-  // 5. Função única para manipular inputs do formulário
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!invitation) {
-      setError("Informações do convite não carregadas.");
-      return;
-    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("As senhas não coincidem");
@@ -130,6 +96,7 @@ export default function CompleteInvitationPage() {
     setError(null);
 
     try {
+      // Criar usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: invitation.email,
         password: formData.password,
@@ -145,48 +112,41 @@ export default function CompleteInvitationPage() {
       if (authError) throw authError;
 
       if (authData.user) {
-        await supabase
-          .from("users")
-          .insert({
-            id: authData.user.id,
-            email: invitation.email,
-            full_name: formData.fullName,
-            role: invitation.role,
-            company_id: invitation.company_id,
-            is_active: true,
-          })
-          .throwOnError();
+        // Criar registro na tabela users
+        const { error: userError } = await supabase.from("users").insert({
+          id: authData.user.id,
+          email: invitation.email,
+          full_name: formData.fullName,
+          role: invitation.role,
+          company_id: invitation.company_id,
+          is_active: true,
+        });
 
+        if (userError) throw userError;
+
+        // Marcar convite como aceito
         await supabase
           .from("user_invitations")
           .update({
             status: "accepted",
             accepted_at: new Date().toISOString(),
           })
-          .eq("id", invitation.id)
-          .throwOnError();
+          .eq("id", invitation.id);
 
         setSuccess(true);
 
+        // Redirecionar após 3 segundos
         setTimeout(() => {
           router.push("/auth/login?message=Cadastro completado com sucesso!");
         }, 3000);
       }
-      // 4. Tratamento de erro mais seguro
-    } catch (err: unknown) {
-      console.error("Erro ao completar cadastro:", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Ocorreu um erro desconhecido");
-      }
+    } catch (error: any) {
+      console.error("Erro ao completar cadastro:", error);
+      setError(error.message || "Erro ao completar cadastro");
     } finally {
       setSubmitting(false);
     }
   };
-
-  // O JSX abaixo permanece o mesmo, mas agora aplicamos o `handleChange`
-  // ...
 
   if (loading) {
     return (
@@ -281,98 +241,100 @@ export default function CompleteInvitationPage() {
           </Typography>
         </Box>
 
-        {invitation && (
-          <Card sx={{ width: "100%", maxWidth: 500 }}>
-            <CardContent sx={{ p: 4 }}>
-              <Typography variant="h4" align="center" gutterBottom>
-                Completar Cadastro
+        <Card sx={{ width: "100%", maxWidth: 500 }}>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h4" align="center" gutterBottom>
+              Completar Cadastro
+            </Typography>
+
+            <Typography
+              variant="body2"
+              align="center"
+              color="text.secondary"
+              sx={{ mb: 3 }}
+            >
+              Complete seu cadastro para acessar o sistema
+            </Typography>
+
+            {/* Informações do convite */}
+            <Box sx={{ mb: 3, p: 2, bgcolor: "#f8f9fa", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Email:</strong> {invitation.email}
               </Typography>
-
-              <Typography
-                variant="body2"
-                align="center"
-                color="text.secondary"
-                sx={{ mb: 3 }}
-              >
-                Complete seu cadastro para acessar o sistema
+              <Typography variant="body2" color="text.secondary">
+                <strong>Perfil:</strong>{" "}
+                {invitation.role === "admin" ? "Administrador" : "Gerente"}
               </Typography>
-
-              <Box sx={{ mb: 3, p: 2, bgcolor: "#f8f9fa", borderRadius: 1 }}>
+              {invitation.companies && (
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Email:</strong> {invitation.email}
+                  <strong>Empresa:</strong> {invitation.companies.name}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Perfil:</strong>{" "}
-                  {invitation.role === "admin" ? "Administrador" : "Gerente"}
-                </Typography>
-                {invitation.companies && (
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Empresa:</strong> {invitation.companies.name}
-                  </Typography>
-                )}
-              </Box>
-
-              {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
-                  {error}
-                </Alert>
               )}
+            </Box>
 
-              <form onSubmit={handleSubmit}>
-                <TextField
-                  fullWidth
-                  label="Nome Completo"
-                  name="fullName" // Adicionado para o handleChange
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  required
-                  sx={{ mb: 2 }}
-                />
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
 
-                <TextField
-                  fullWidth
-                  label="Senha"
-                  type="password"
-                  name="password" // Adicionado para o handleChange
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  helperText="Mínimo 6 caracteres"
-                  sx={{ mb: 2 }}
-                />
+            <form onSubmit={handleSubmit}>
+              <TextField
+                fullWidth
+                label="Nome Completo"
+                value={formData.fullName}
+                onChange={(e) =>
+                  setFormData({ ...formData, fullName: e.target.value })
+                }
+                required
+                sx={{ mb: 2 }}
+              />
 
-                <TextField
-                  fullWidth
-                  label="Confirmar Senha"
-                  type="password"
-                  name="confirmPassword" // Adicionado para o handleChange
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  sx={{ mb: 3 }}
-                />
+              <TextField
+                fullWidth
+                label="Senha"
+                type="password"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                required
+                helperText="Mínimo 6 caracteres"
+                sx={{ mb: 2 }}
+              />
 
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  size="large"
-                  disabled={submitting}
-                  sx={{ mb: 2 }}
-                >
-                  {submitting ? (
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <CircularProgress size={20} color="inherit" />
-                      <span>Processando...</span>
-                    </Box>
-                  ) : (
-                    "Completar Cadastro"
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+              <TextField
+                fullWidth
+                label="Confirmar Senha"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={(e) =>
+                  setFormData({ ...formData, confirmPassword: e.target.value })
+                }
+                required
+                sx={{ mb: 3 }}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                size="large"
+                disabled={submitting}
+                sx={{ mb: 2 }}
+              >
+                {submitting ? (
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <CircularProgress size={20} color="inherit" />
+                    <span>Processando...</span>
+                  </Box>
+                ) : (
+                  "Completar Cadastro"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </Box>
     </Container>
   );
