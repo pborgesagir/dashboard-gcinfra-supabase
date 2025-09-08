@@ -231,7 +231,9 @@ export default function FiltersSection({
         sx={{
           p: 3,
           pb: 2,
-          background: "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)",
+          backgroundColor: (theme) => theme.palette.mode === 'dark' 
+            ? 'rgba(255, 255, 255, 0.05)' 
+            : 'rgba(0, 0, 0, 0.02)',
           borderBottom: "1px solid",
           borderColor: "divider",
         }}

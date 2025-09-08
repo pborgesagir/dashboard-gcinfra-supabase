@@ -104,11 +104,6 @@ export default function FamiliaChart({ data, loading, chartType = 'bar' }: Famil
         <Tooltip
           formatter={formatTooltip}
           labelFormatter={(label) => `Família: ${label || 'Não informado'}`}
-          contentStyle={{
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px'
-          }}
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px' }}
@@ -225,7 +220,7 @@ export default function FamiliaChart({ data, loading, chartType = 'bar' }: Famil
         </Box>
 
         {/* Top 5 families */}
-        <Box sx={{ mt: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+        <Box sx={{ mt: 3, p: 2, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)', borderRadius: 1 }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Top 5 Famílias Mais Frequentes:
           </Typography>

@@ -123,7 +123,7 @@ export default function TaxaCumprimentoPlanejadaChart({
               bottom: 60
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
             <XAxis 
               dataKey="monthDisplay"
               angle={-45}
@@ -140,11 +140,6 @@ export default function TaxaCumprimentoPlanejadaChart({
             <Tooltip
               formatter={formatTooltip}
               labelFormatter={(label) => `Mês: ${label}`}
-              contentStyle={{
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #dee2e6',
-                borderRadius: '4px'
-              }}
               labelStyle={{ fontWeight: 'bold' }}
             />
             <Legend
@@ -222,7 +217,7 @@ export default function TaxaCumprimentoPlanejadaChart({
         </Box>
 
         {/* Performance indicators */}
-        <Box sx={{ mt: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+        <Box sx={{ mt: 3, p: 2, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)', borderRadius: 1 }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Indicadores de Performance:
           </Typography>

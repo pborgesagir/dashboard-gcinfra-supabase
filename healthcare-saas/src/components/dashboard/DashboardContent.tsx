@@ -25,7 +25,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  LinearProgress
 } from '@mui/material'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
@@ -1054,8 +1055,28 @@ export default function DashboardContent() {
       )}
 
       {loading && loadingProgress && (
-        <Alert severity="info" sx={{ mb: 3 }}>
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mb: 3,
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
           {loadingProgress}
+          <LinearProgress
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              borderRadius: 0,
+              '& .MuiLinearProgress-bar': {
+                backgroundColor: '#1976d2',
+              }
+            }}
+          />
         </Alert>
       )}
 
@@ -1203,8 +1224,10 @@ export default function DashboardContent() {
             aria-controls="data-table-content"
             id="data-table-header"
             sx={{
-              bgcolor: '#f5f5f5',
-              '&:hover': { bgcolor: '#eeeeee' }
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              '&:hover': { 
+                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <Box display="flex" alignItems="center" gap={2} width="100%">
