@@ -360,10 +360,10 @@ export default function LoginPage() {
           >
             <Box textAlign="center" mb={4}>
               <Typography variant="h4" fontWeight="600" gutterBottom>
-                Acesso Seguro
+                Bem-vindo(a)!
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Entre com suas credenciais para acessar o painel de gestão
+                Entre com suas credenciais para acessar
               </Typography>
             </Box>
 
@@ -497,7 +497,7 @@ export default function LoginPage() {
                 color="primary.main"
                 sx={{ fontWeight: 500 }}
               >
-                Entre em contato com o administrador
+                Entre em contato com a GCINFRA
               </Typography>
             </Box>
           </Paper>
