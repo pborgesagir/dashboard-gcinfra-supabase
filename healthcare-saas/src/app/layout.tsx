@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "GCINFRA 360º",
-  description: "Plataforma profissional de gestão de infraestrutura",
+  description: "Plataforma de gestão de infraestrutura hospitalar",
   icons: {
     icon: "/logodaagir.png",
     shortcut: "/logodaagir.png",
