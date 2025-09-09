@@ -48,7 +48,7 @@ export default function CompanyStatusGauges({ data, loading }: Props) {
           width: 2
         }
       },
-      textinfo: 'none', // Remover texto das fatias
+      textinfo: 'none' as const, // Remover texto das fatias
       hovertemplate: '<b>%{label}</b><br>' +
                      'Quantidade: %{value}<br>' +
                      'Porcentagem: %{percent}<br>' +

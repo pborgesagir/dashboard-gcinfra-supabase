@@ -61,6 +61,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-lifecycles-compat": "^3.0.4",
+    "@types/react-plotly.js": "^2.6.3",
     "@types/resolve": "^1.20.6",
     "@types/retry": "^0.12.5",
     "@types/semver": "^7.7.1",

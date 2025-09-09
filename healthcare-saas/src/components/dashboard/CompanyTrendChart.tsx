@@ -68,12 +68,11 @@ export default function CompanyTrendChart({ data, companies, loading, title, yAx
       x: data.map(item => item.monthDisplay),
       y: averageData,
       type: 'scatter' as const,
-      mode: 'lines' as const,
+      mode: 'lines+markers' as const,
       name: 'Média',
       line: {
         color: '#000000',
-        width: 3,
-        dash: 'dash'
+        width: 3
       },
       marker: {
         size: 0,
@@ -92,13 +91,13 @@ export default function CompanyTrendChart({ data, companies, loading, title, yAx
       font: { size: 16, color: '#333' }
     },
     xaxis: {
-      title: 'Período',
+      title: { text: 'Período' },
       showgrid: true,
       gridcolor: 'rgba(0,0,0,0.1)',
       zeroline: false
     },
     yaxis: {
-      title: yAxisTitle,
+      title: { text: yAxisTitle },
       showgrid: true,
       gridcolor: 'rgba(0,0,0,0.1)',
       zeroline: false
