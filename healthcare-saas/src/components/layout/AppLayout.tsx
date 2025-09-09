@@ -70,9 +70,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push('/auth/login')
-    handleClose()
+    try {
+      handleClose()
+      await signOut()
+      // Force a page reload to clear any cached state and ensure proper redirect
+      window.location.href = '/auth/login'
+    } catch (error) {
+      console.error('Error during logout:', error)
+      // Fallback: still redirect to login even if signOut fails
+      window.location.href = '/auth/login'
+    }
   }
 
   const navigationItems = [
