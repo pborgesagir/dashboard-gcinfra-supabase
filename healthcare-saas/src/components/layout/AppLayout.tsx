@@ -17,8 +17,11 @@ import {
   ListItemIcon,
   ListItemText,
   Box,
-  Divider,
-  Chip
+  Chip,
+  useTheme,
+  alpha,
+  Paper,
+  Avatar
 } from '@mui/material'
 import {
   AccountCircle,
@@ -27,8 +30,6 @@ import {
   Build,
   Business,
   People,
-  Analytics,
-  Settings,
   ExitToApp,
   MedicalServices,
   ChevronLeft,
@@ -52,6 +53,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   
   const { userProfile, signOut, isAdmin } = useAuth()
   const router = useRouter()
+  const theme = useTheme()
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
@@ -127,78 +129,284 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   ]
 
+  // Professional gradient colors matching login screen
+  const gradientColors = {
+    light: {
+      primary: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+      secondary: 'linear-gradient(135deg, #00695c 0%, #004d40 100%)',
+      accent: 'linear-gradient(135deg, #0277bd 0%, #01579b 100%)'
+    },
+    dark: {
+      primary: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+      secondary: 'linear-gradient(135deg, #00695c 0%, #004d40 100%)',
+      accent: 'linear-gradient(135deg, #0277bd 0%, #01579b 100%)'
+    }
+  }
+
+  const currentGradients = theme.palette.mode === 'dark' ? gradientColors.dark : gradientColors.light
+
   const drawer = (
-    <Box>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-        <Image 
-          src="/logodaagir.png" 
-          alt="360° - GCINFRA Logo" 
-          width={40} 
-          height={40}
-          style={{ objectFit: 'contain' }}
-        />
+    <Box
+      sx={{
+        height: '100%',
+        background: theme.palette.mode === 'dark' 
+          ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
+          : 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Background geometric pattern for 360° concept */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `
+            radial-gradient(circle at 10% 20%, ${alpha(theme.palette.primary.main, 0.08)} 0%, transparent 50%),
+            radial-gradient(circle at 90% 80%, ${alpha(theme.palette.secondary.main, 0.05)} 0%, transparent 50%)
+          `,
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: '20%',
+            right: '-50px',
+            width: '100px',
+            height: '100px',
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            borderRadius: '50%',
+            transform: 'rotate(45deg)'
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: '30%',
+            left: '-30px',
+            width: '60px',
+            height: '60px',
+            border: `1px solid ${alpha(theme.palette.secondary.main, 0.08)}`,
+            borderRadius: '50%',
+            transform: 'rotate(-30deg)'
+          }
+        }}
+      />
+
+      {/* Header with logo and title */}
+      <Box 
+        sx={{ 
+          p: sidebarOpen ? 3 : 2,
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2, 
+          justifyContent: sidebarOpen ? 'flex-start' : 'center',
+          background: currentGradients.primary,
+          color: 'white',
+          position: 'relative',
+          zIndex: 1,
+          borderBottom: `1px solid ${alpha('#ffffff', 0.1)}`
+        }}
+      >
+        {/* 360° rotating logo element */}
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {sidebarOpen && (
+            <Box
+              sx={{
+                position: 'absolute',
+                width: 60,
+                height: 60,
+                border: '2px solid rgba(255,255,255,0.2)',
+                borderRadius: '50%',
+                animation: 'rotate 20s linear infinite',
+                borderTopColor: 'rgba(255,255,255,0.6)',
+                '@keyframes rotate': {
+                  '0%': { transform: 'rotate(0deg)' },
+                  '100%': { transform: 'rotate(360deg)' }
+                }
+              }}
+            />
+          )}
+          <Image 
+            src="/logodaagir.png" 
+            alt="360° - GCINFRA Logo" 
+            width={sidebarOpen ? 48 : 40} 
+            height={sidebarOpen ? 48 : 40}
+            style={{ 
+              objectFit: 'contain',
+              filter: 'brightness(0) invert(1)',
+              position: 'relative',
+              zIndex: 1
+            }}
+          />
+        </Box>
+
         {sidebarOpen && (
-          <Box>
-            <Typography variant="h6" noWrap>
+          <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Typography variant="h6" noWrap fontWeight="bold" sx={{ mb: 0.5 }}>
               360° - GCINFRA
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Gestão de Infraestrutura
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              Gestão Inteligente de Infraestrutura
             </Typography>
           </Box>
         )}
       </Box>
       
-      <Divider />
-      
+      {/* User Profile Section */}
       {sidebarOpen && (
-        <Box sx={{ p: 2 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            {userProfile?.email}
+        <Box
+          sx={{ 
+            mt: 3,
+            mb: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            position: 'relative',
+            zIndex: 1
+          }}
+        >
+          <Avatar
+            sx={{
+              width: 56,
+              height: 56,
+              background: currentGradients.accent,
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '1.4rem',
+              boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`
+            }}
+          >
+            {userProfile?.email?.charAt(0).toUpperCase()}
+          </Avatar>
+          
+          <Typography variant="subtitle1" fontWeight="600" textAlign="center">
+            {userProfile?.email?.split('@')[0]}
           </Typography>
-          <Box display="flex" gap={1} flexWrap="wrap">
+
+          <Box display="flex" gap={1} flexWrap="wrap" justifyContent="center">
             <Chip 
               label={userProfile?.role} 
               size="small" 
-              color={isAdmin ? 'error' : 'primary'}
+              sx={{
+                background: isAdmin ? 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)' : currentGradients.primary,
+                color: 'white',
+                fontWeight: 600,
+                '& .MuiChip-label': {
+                  px: 1.5
+                }
+              }}
             />
             {userProfile?.company && (
               <Chip 
                 label={userProfile.company.name} 
                 size="small" 
                 variant="outlined"
+                sx={{
+                  borderColor: alpha(theme.palette.primary.main, 0.3),
+                  color: theme.palette.primary.main,
+                  fontWeight: 500,
+                  '& .MuiChip-label': {
+                    px: 1.5
+                  }
+                }}
               />
             )}
           </Box>
         </Box>
       )}
       
-      <Divider />
-      
-      <List>
+      {/* Navigation Menu */}
+      <List sx={{ px: 1, py: 2, position: 'relative', zIndex: 1 }}>
         {navigationItems
           .filter(item => item.show)
-          .map((item) => (
-            <ListItem
-              key={item.text}
-              onClick={() => {
-                router.push(item.path)
-                setMobileOpen(false)
-              }}
-              sx={{
-                cursor: 'pointer',
-                '&:hover': {
-                  backgroundColor: 'action.hover'
-                }
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: sidebarOpen ? 56 : 'auto', justifyContent: 'center' }}>
-                {item.icon}
-              </ListItemIcon>
-              {sidebarOpen && <ListItemText primary={item.text} />}
-            </ListItem>
-          ))}
+          .map((item) => {
+            const isActive = false // You can add active route detection here
+            
+            return (
+              <ListItem
+                key={item.text}
+                onClick={() => {
+                  router.push(item.path)
+                  setMobileOpen(false)
+                }}
+                sx={{
+                  cursor: 'pointer',
+                  mx: 1,
+                  mb: 0.5,
+                  borderRadius: 2,
+                  minHeight: 48,
+                  background: isActive ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                  border: isActive ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : '1px solid transparent',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: alpha(theme.palette.primary.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                    transform: 'translateX(4px)',
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.15)}`
+                  }
+                }}
+              >
+                <ListItemIcon 
+                  sx={{ 
+                    minWidth: sidebarOpen ? 56 : 'auto', 
+                    justifyContent: 'center',
+                    color: isActive ? theme.palette.primary.main : theme.palette.text.secondary,
+                    transition: 'color 0.3s ease'
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                {sidebarOpen && (
+                  <ListItemText 
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? theme.palette.primary.main : theme.palette.text.primary,
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                )}
+              </ListItem>
+            )
+          })}
       </List>
+
+      {/* Footer with gradient accent */}
+      {sidebarOpen && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            p: 2,
+            background: alpha(theme.palette.secondary.main, 0.1),
+            backdropFilter: 'blur(10px)',
+            borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+          }}
+        >
+          <Typography 
+            variant="caption" 
+            color="text.secondary" 
+            textAlign="center" 
+            display="block"
+            sx={{ opacity: 0.7 }}
+          >
+            © 2024 360° - GCINFRA
+          </Typography>
+          <Typography 
+            variant="caption" 
+            color="text.secondary" 
+            textAlign="center" 
+            display="block"
+            sx={{ opacity: 0.6 }}
+          >
+            Infraestrutura Hospitalar
+          </Typography>
+        </Box>
+      )}
     </Box>
   )
 
@@ -207,10 +415,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Box sx={{ display: 'flex' }}>
         <AppBar
         position="fixed"
+        elevation={0}
         sx={{
           width: { sm: sidebarOpen ? `calc(100% - ${drawerWidth}px)` : `calc(100% - 72px)` },
           ml: { sm: sidebarOpen ? `${drawerWidth}px` : '72px' },
-          transition: 'width 0.3s, margin 0.3s'
+          transition: 'width 0.3s ease-in-out, margin 0.3s ease-in-out',
+          background: alpha(theme.palette.background.paper, 0.9),
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          color: theme.palette.text.primary,
+          boxShadow: `0 1px 8px ${alpha(theme.palette.common.black, 0.08)}`
         }}
       >
         <Toolbar>
@@ -228,18 +442,42 @@ export default function AppLayout({ children }: AppLayoutProps) {
             color="inherit"
             aria-label="alternar sidebar"
             onClick={handleSidebarToggle}
-            sx={{ mr: 2, display: { xs: 'none', sm: 'inline-flex' } }}
+            sx={{ 
+              mr: 2, 
+              display: { xs: 'none', sm: 'inline-flex' },
+              borderRadius: 2,
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                background: alpha(theme.palette.primary.main, 0.08),
+                transform: 'scale(1.05)'
+              }
+            }}
           >
             {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
           </IconButton>
           
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography 
+            variant="h6" 
+            noWrap 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              fontWeight: 600,
+              background: currentGradients.primary,
+              backgroundClip: 'text',
+              color: 'transparent',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}
+          >
             {isAdmin ? 'Painel Administrativo' : 'Dashboard'}
           </Typography>
           
-          <ThemeToggle />
+          <Box sx={{ mr: 2 }}>
+            <ThemeToggle />
+          </Box>
           
-          <div>
+          <Box>
             <IconButton
               size="large"
               aria-label="account of current user"
@@ -247,14 +485,33 @@ export default function AppLayout({ children }: AppLayoutProps) {
               aria-haspopup="true"
               onClick={handleMenu}
               color="inherit"
+              sx={{
+                borderRadius: 2,
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  background: alpha(theme.palette.primary.main, 0.08),
+                  transform: 'scale(1.05)'
+                }
+              }}
             >
-              <AccountCircle />
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  background: currentGradients.accent,
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem'
+                }}
+              >
+                {userProfile?.email?.charAt(0).toUpperCase()}
+              </Avatar>
             </IconButton>
             <Menu
               id="menu-appbar"
               anchorEl={anchorEl}
               anchorOrigin={{
-                vertical: 'top',
+                vertical: 'bottom',
                 horizontal: 'right',
               }}
               keepMounted
@@ -264,16 +521,50 @@ export default function AppLayout({ children }: AppLayoutProps) {
               }}
               open={Boolean(anchorEl)}
               onClose={handleClose}
+              sx={{
+                '& .MuiPaper-root': {
+                  borderRadius: 2,
+                  mt: 1,
+                  background: alpha(theme.palette.background.paper, 0.95),
+                  backdropFilter: 'blur(20px)',
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`
+                }
+              }}
             >
-              <MenuItem onClick={() => { router.push('/profile'); handleClose(); }}>
+              <MenuItem 
+                onClick={() => { router.push('/profile'); handleClose(); }}
+                sx={{
+                  borderRadius: 1,
+                  mx: 1,
+                  my: 0.5,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: alpha(theme.palette.primary.main, 0.08)
+                  }
+                }}
+              >
+                <AccountCircle sx={{ mr: 2, color: 'text.secondary' }} />
                 Perfil
               </MenuItem>
-              <MenuItem onClick={handleSignOut}>
-                <ExitToApp sx={{ mr: 1 }} />
+              <MenuItem 
+                onClick={handleSignOut}
+                sx={{
+                  borderRadius: 1,
+                  mx: 1,
+                  my: 0.5,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: alpha(theme.palette.error.main, 0.08),
+                    color: 'error.main'
+                  }
+                }}
+              >
+                <ExitToApp sx={{ mr: 2, color: 'text.secondary' }} />
                 Sair
               </MenuItem>
             </Menu>
-          </div>
+          </Box>
         </Toolbar>
       </AppBar>
       
@@ -298,7 +589,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
               width: drawerWidth,
-              overflowX: 'hidden'
+              overflowX: 'hidden',
+              borderRight: 'none',
+              boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.15)}`
             },
           }}
         >
@@ -311,8 +604,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
               width: sidebarOpen ? drawerWidth : 72,
-              transition: 'width 0.3s',
-              overflowX: 'hidden'
+              transition: 'width 0.3s ease-in-out',
+              overflowX: 'hidden',
+              borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}`
             },
           }}
           open
