@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Box, Typography, Grid, Card, CardContent } from '@mui/material'
+import { Box, Typography, Grid, Card, CardContent, Chip } from '@mui/material'
 import Plot from 'react-plotly.js'
 
 interface CompanyStatusData {
@@ -31,87 +31,93 @@ export default function CompanyStatusGauges({ data, loading }: Props) {
     )
   }
 
-  const createGaugeData = (company: CompanyStatusData) => {
-    const abertaPercent = company.total > 0 ? (company.aberta / company.total) * 100 : 0
-    const fechadaPercent = company.total > 0 ? (company.fechada / company.total) * 100 : 0
-    const pendentePercent = company.total > 0 ? (company.pendente / company.total) * 100 : 0
+  const createDonutData = (company: CompanyStatusData) => {
+    const values = [company.aberta, company.fechada, company.pendente]
+    const labels = ['Abertas', 'Fechadas', 'Pendentes']
+    const colors = ['#f44336', '#4caf50', '#ff9800']
 
-    return [
-      {
-        domain: { x: [0, 1], y: [0.7, 1] },
-        value: abertaPercent,
-        title: { text: `<b>Abertas</b><br>${abertaPercent.toFixed(1)}%` },
-        type: 'indicator' as const,
-        mode: 'gauge+number' as const,
-        gauge: {
-          axis: { range: [null, 100] },
-          bar: { color: '#f44336' },
-          steps: [
-            { range: [0, 50], color: 'lightgray' },
-            { range: [50, 100], color: 'gray' }
-          ],
-          threshold: {
-            line: { color: 'red', width: 4 },
-            thickness: 0.75,
-            value: 90
-          }
+    return [{
+      values,
+      labels,
+      type: 'pie' as const,
+      hole: 0.5, // Criar efeito donut com centro limpo
+      marker: {
+        colors,
+        line: {
+          color: '#ffffff',
+          width: 2
         }
       },
-      {
-        domain: { x: [0, 1], y: [0.35, 0.65] },
-        value: fechadaPercent,
-        title: { text: `<b>Fechadas</b><br>${fechadaPercent.toFixed(1)}%` },
-        type: 'indicator' as const,
-        mode: 'gauge+number' as const,
-        gauge: {
-          axis: { range: [null, 100] },
-          bar: { color: '#4caf50' },
-          steps: [
-            { range: [0, 50], color: 'lightgray' },
-            { range: [50, 100], color: 'gray' }
-          ],
-          threshold: {
-            line: { color: 'green', width: 4 },
-            thickness: 0.75,
-            value: 90
-          }
-        }
-      },
-      {
-        domain: { x: [0, 1], y: [0, 0.3] },
-        value: pendentePercent,
-        title: { text: `<b>Pendentes</b><br>${pendentePercent.toFixed(1)}%` },
-        type: 'indicator' as const,
-        mode: 'gauge+number' as const,
-        gauge: {
-          axis: { range: [null, 100] },
-          bar: { color: '#ff9800' },
-          steps: [
-            { range: [0, 50], color: 'lightgray' },
-            { range: [50, 100], color: 'gray' }
-          ],
-          threshold: {
-            line: { color: 'orange', width: 4 },
-            thickness: 0.75,
-            value: 90
-          }
-        }
-      }
-    ]
+      textinfo: 'none', // Remover texto das fatias
+      hovertemplate: '<b>%{label}</b><br>' +
+                     'Quantidade: %{value}<br>' +
+                     'Porcentagem: %{percent}<br>' +
+                     '<extra></extra>',
+      showlegend: false
+    }]
   }
 
   const layout = {
-    font: { family: 'Roboto, sans-serif', size: 10 },
+    font: { family: 'Roboto, sans-serif', size: 12 },
     showlegend: false,
-    margin: { l: 20, r: 20, t: 20, b: 20 },
+    margin: { l: 10, r: 10, t: 10, b: 10 },
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    height: 300
+    height: 200,
+    annotations: []
   }
 
   const config = {
     displayModeBar: false,
     responsive: true
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Abertas': return '#f44336'
+      case 'Fechadas': return '#4caf50'
+      case 'Pendentes': return '#ff9800'
+      default: return '#gray'
+    }
+  }
+
+  const createLegend = (company: CompanyStatusData) => {
+    const statusData = [
+      { label: 'Abertas', count: company.aberta, color: '#f44336' },
+      { label: 'Fechadas', count: company.fechada, color: '#4caf50' },
+      { label: 'Pendentes', count: company.pendente, color: '#ff9800' }
+    ]
+
+    return statusData.map((status) => {
+      const percentage = company.total > 0 ? ((status.count / company.total) * 100).toFixed(1) : '0.0'
+      return (
+        <Box key={status.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              backgroundColor: status.color,
+              borderRadius: '50%',
+              flexShrink: 0
+            }}
+          />
+          <Typography variant="body2" sx={{ flexGrow: 1 }}>
+            {status.label}
+          </Typography>
+          <Chip
+            label={`${status.count} (${percentage}%)`}
+            size="small"
+            variant="outlined"
+            sx={{ 
+              fontSize: '0.75rem',
+              height: 24,
+              borderColor: status.color,
+              color: status.color
+            }}
+          />
+        </Box>
+      )
+    })
   }
 
   return (
@@ -122,24 +128,35 @@ export default function CompanyStatusGauges({ data, loading }: Props) {
         </Typography>
         
         {data.length > 0 ? (
-          <Grid container spacing={2}>
-            {data.map((company) => (
-              <Grid item xs={12} sm={6} md={4} key={company.empresa}>
+          <Grid container spacing={3}>
+            {data.slice(0, 6).map((company) => ( // Limitar a 6 empresas para melhor layout
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={company.empresa}>
+                {/* Cabeçalho da empresa */}
                 <Box sx={{ textAlign: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" fontWeight="bold">
+                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                     {company.empresa}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Total: {company.total} OS
-                  </Typography>
+                  <Chip 
+                    label={`${company.total} OS Total`} 
+                    size="small" 
+                    color="primary" 
+                    variant="outlined"
+                  />
                 </Box>
-                <Box sx={{ height: 300 }}>
+
+                {/* Gráfico de rosca */}
+                <Box sx={{ height: 200, mb: 2 }}>
                   <Plot
-                    data={createGaugeData(company)}
+                    data={createDonutData(company)}
                     layout={layout}
                     config={config}
                     style={{ width: '100%', height: '100%' }}
                   />
+                </Box>
+
+                {/* Legenda com contagem e porcentagem */}
+                <Box>
+                  {createLegend(company)}
                 </Box>
               </Grid>
             ))}

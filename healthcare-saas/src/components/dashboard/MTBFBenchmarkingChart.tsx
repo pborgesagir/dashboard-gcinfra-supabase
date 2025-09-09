@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Box, Typography, Grid, Card, CardContent, Chip } from '@mui/material'
+import { TrendingUp, TrendingDown } from '@mui/icons-material'
 import Plot from 'react-plotly.js'
 
 interface MTBFCompanyData {
@@ -33,23 +34,49 @@ interface Props {
 export default function MTBFBenchmarkingChart({ data, loading }: Props) {
   if (loading) {
     return (
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
+      <Card elevation={0} sx={{ bgcolor: 'background.paper', borderRadius: 3 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Typography variant="h5" fontWeight={600} fontFamily="'Inter', sans-serif">
             Análise MTBF por Empresa e Família
           </Typography>
-          <Typography color="text.secondary">Carregando...</Typography>
+          <Typography color="text.secondary" sx={{ mt: 1, fontFamily: "'Inter', sans-serif" }}>
+            Carregando...
+          </Typography>
         </CardContent>
       </Card>
     )
   }
 
-  const colors = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ]
+  // Função para formatar números grandes
+  const formatValue = (value: number): string => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}k`
+    return value.toFixed(0)
+  }
 
-  // Company MTBF bar chart
+  // Paleta de cores moderna e profissional
+  const colors = {
+    primary: '#6366f1',      // Índigo moderno
+    secondary: '#8b5cf6',    // Violeta
+    accent: '#06b6d4',       // Cyan
+    success: '#10b981',      // Verde esmeralda
+    warning: '#f59e0b',      // Âmbar
+    error: '#ef4444',        // Vermelho moderno
+    neutral: {
+      50: '#f8fafc',
+      100: '#f1f5f9',
+      200: '#e2e8f0',
+      300: '#cbd5e1',
+      400: '#94a3b8',
+      500: '#64748b',
+      600: '#475569',
+      700: '#334155',
+      800: '#1e293b',
+      900: '#0f172a'
+    }
+  }
+
+  // Company MTBF bar chart com gradiente sutil
   const companyBarData = [
     {
       x: data.byCompany.map(item => item.empresa),
@@ -57,195 +84,449 @@ export default function MTBFBenchmarkingChart({ data, loading }: Props) {
       type: 'bar' as const,
       name: 'MTBF por Empresa',
       marker: {
-        color: colors.slice(0, data.byCompany.length),
-        line: {
-          color: 'rgba(0,0,0,0.8)',
-          width: 1
-        }
+        color: colors.primary,
+        line: { width: 0 },
+        // Barras com cantos arredondados via CSS
+        pattern: { shape: '' }
       },
       hovertemplate: '<b>%{x}</b><br>' +
-                     'MTBF: %{y:.1f} horas<br>' +
-                     '<extra></extra>'
+                     'MTBF: %{y:,.1f} horas<br>' +
+                     '<extra></extra>',
+      textposition: 'outside',
+      textfont: {
+        family: "'Inter', sans-serif",
+        size: 11,
+        color: colors.neutral[600]
+      }
     }
   ]
 
-  // Top 5 Familias MTBF
+  // Top Famílias com cor de sucesso
   const topFamiliasData = [
     {
       x: data.topFamilias.map(item => item.familia),
       y: data.topFamilias.map(item => item.mtbf),
       type: 'bar' as const,
-      name: 'Top 5 Famílias (Maior MTBF)',
+      name: 'Maiores MTBF',
       marker: {
-        color: '#4caf50',
-        line: {
-          color: 'rgba(0,0,0,0.8)',
-          width: 1
-        }
+        color: colors.success,
+        line: { width: 0 }
       },
       hovertemplate: '<b>%{x}</b><br>' +
-                     'MTBF: %{y:.1f} horas<br>' +
+                     'MTBF: %{y:,.1f} horas<br>' +
                      '<extra></extra>'
     }
   ]
 
-  // Bottom 5 Familias MTBF  
+  // Bottom Famílias com cor de erro
   const bottomFamiliasData = [
     {
       x: data.bottomFamilias.map(item => item.familia),
       y: data.bottomFamilias.map(item => item.mtbf),
       type: 'bar' as const,
-      name: 'Top 5 Famílias (Menor MTBF)',
+      name: 'Menores MTBF',
       marker: {
-        color: '#f44336',
-        line: {
-          color: 'rgba(0,0,0,0.8)',
-          width: 1
-        }
+        color: colors.error,
+        line: { width: 0 }
       },
       hovertemplate: '<b>%{x}</b><br>' +
-                     'MTBF: %{y:.1f} horas<br>' +
+                     'MTBF: %{y:,.1f} horas<br>' +
                      '<extra></extra>'
     }
   ]
 
-  const layout = {
-    font: { family: 'Roboto, sans-serif', size: 12 },
+  // Layout moderno e limpo
+  const createLayout = (yAxisTitle: string) => ({
+    font: { 
+      family: "'Inter', sans-serif", 
+      size: 12, 
+      color: colors.neutral[600] 
+    },
     showlegend: false,
-    margin: { l: 60, r: 40, t: 40, b: 100 },
+    margin: { l: 70, r: 20, t: 20, b: 60 },
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    height: 300,
+    height: 280,
     xaxis: {
-      tickangle: -45
+      tickangle: -45,
+      tickfont: { 
+        size: 11, 
+        color: colors.neutral[500],
+        family: "'Inter', sans-serif"
+      },
+      showgrid: false,
+      showline: true,
+      linecolor: colors.neutral[200],
+      linewidth: 1
     },
     yaxis: {
-      title: 'MTBF (horas)',
+      title: {
+        text: yAxisTitle,
+        font: { 
+          size: 12, 
+          color: colors.neutral[600],
+          family: "'Inter', sans-serif"
+        }
+      },
       showgrid: true,
-      gridcolor: 'rgba(0,0,0,0.1)'
+      gridcolor: colors.neutral[100],
+      gridwidth: 1,
+      showline: false,
+      tickfont: { 
+        size: 11, 
+        color: colors.neutral[500],
+        family: "'Inter', sans-serif"
+      },
+      tickformat: '',
+      tickmode: 'linear'
+    },
+    hovermode: 'closest' as const,
+    hoverlabel: {
+      bgcolor: colors.neutral[800],
+      bordercolor: colors.neutral[700],
+      font: { 
+        color: 'white', 
+        family: "'Inter', sans-serif",
+        size: 12
+      }
     }
-  }
+  })
 
   const config = {
     displayModeBar: false,
     responsive: true
   }
 
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Análise MTBF por Empresa e Família
+  // Componente de estatística moderna
+  const StatCard = ({ 
+    company, 
+    label, 
+    value, 
+    familia, 
+    isHighest 
+  }: { 
+    company: string
+    label: string
+    value: number
+    familia: string
+    isHighest: boolean 
+  }) => (
+    <Card 
+      elevation={0}
+      sx={{ 
+        bgcolor: 'background.paper',
+        border: `1px solid ${colors.neutral[200]}`,
+        borderRadius: 2.5,
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': {
+          borderColor: colors.primary,
+          boxShadow: `0 4px 12px ${colors.primary}15`
+        }
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+          <Typography 
+            variant="h6" 
+            fontWeight={600}
+            fontFamily="'Inter', sans-serif"
+            color="text.primary"
+          >
+            {company}
+          </Typography>
+          {isHighest ? (
+            <TrendingUp sx={{ color: colors.success, fontSize: 20 }} />
+          ) : (
+            <TrendingDown sx={{ color: colors.error, fontSize: 20 }} />
+          )}
+        </Box>
+
+        <Typography 
+          variant="body2" 
+          color="text.secondary"
+          fontFamily="'Inter', sans-serif"
+          mb={1}
+          fontWeight={500}
+        >
+          {label}
         </Typography>
+
+        <Typography 
+          variant="h4" 
+          fontWeight={700}
+          fontFamily="'Inter', sans-serif"
+          color={isHighest ? colors.success : colors.error}
+          mb={1}
+        >
+          {formatValue(value)}h
+        </Typography>
+
+        <Chip
+          label={familia}
+          size="small"
+          sx={{
+            bgcolor: isHighest ? `${colors.success}15` : `${colors.error}15`,
+            color: isHighest ? colors.success : colors.error,
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 500,
+            fontSize: '0.75rem',
+            height: 24,
+            border: `1px solid ${isHighest ? colors.success : colors.error}25`
+          }}
+        />
+      </CardContent>
+    </Card>
+  )
+
+  return (
+    <Card elevation={0} sx={{ bgcolor: 'background.paper', borderRadius: 3 }}>
+      <CardContent sx={{ p: 4 }}>
+        {/* Header moderno */}
+        <Box mb={4}>
+          <Typography 
+            variant="h5" 
+            fontWeight={600}
+            fontFamily="'Inter', sans-serif"
+            color="text.primary"
+            gutterBottom
+          >
+            Análise MTBF por Empresa e Família
+          </Typography>
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            fontFamily="'Inter', sans-serif"
+          >
+            Mean Time Between Failures - Indicadores de confiabilidade por empresa e família de equipamentos
+          </Typography>
+        </Box>
         
-        <Grid container spacing={3}>
-          {/* Company MTBF Bar Chart */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" gutterBottom>
-              MTBF por Empresa
-            </Typography>
+        {/* Layout em grid otimizado */}
+        <Grid container spacing={4}>
+          {/* Gráfico principal - MTBF por Empresa */}
+          <Grid size={{ xs: 12, lg: 8 }}>
+            <Box mb={3}>
+              <Typography 
+                variant="h6" 
+                fontWeight={600}
+                fontFamily="'Inter', sans-serif"
+                color="text.primary"
+                gutterBottom
+              >
+                MTBF por Empresa
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                fontFamily="'Inter', sans-serif"
+              >
+                Comparativo do tempo médio entre falhas
+              </Typography>
+            </Box>
+            
             {data.byCompany.length > 0 ? (
-              <Box sx={{ height: 300 }}>
+              <Box 
+                sx={{ 
+                  height: 280,
+                  bgcolor: colors.neutral[50],
+                  borderRadius: 2,
+                  p: 2
+                }}
+              >
                 <Plot
                   data={companyBarData}
-                  layout={layout}
+                  layout={createLayout('MTBF (horas)')}
                   config={config}
                   style={{ width: '100%', height: '100%' }}
                 />
               </Box>
             ) : (
-              <Typography color="text.secondary" textAlign="center" py={4}>
-                Nenhum dado disponível para empresas
-              </Typography>
-            )}
-          </Grid>
-
-          {/* Top Familias MTBF */}
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>
-              Top 5 Maiores MTBF por Família
-            </Typography>
-            {data.topFamilias.length > 0 ? (
-              <Box sx={{ height: 300 }}>
-                <Plot
-                  data={topFamiliasData}
-                  layout={layout}
-                  config={config}
-                  style={{ width: '100%', height: '100%' }}
-                />
+              <Box 
+                sx={{ 
+                  height: 280,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: colors.neutral[50],
+                  borderRadius: 2
+                }}
+              >
+                <Typography 
+                  color="text.secondary" 
+                  fontFamily="'Inter', sans-serif"
+                >
+                  Nenhum dado disponível para empresas
+                </Typography>
               </Box>
-            ) : (
-              <Typography color="text.secondary" textAlign="center" py={4}>
-                Nenhum dado disponível
-              </Typography>
             )}
           </Grid>
 
-          {/* Bottom Familias MTBF */}
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>
-              Top 5 Menores MTBF por Família
-            </Typography>
-            {data.bottomFamilias.length > 0 ? (
-              <Box sx={{ height: 300 }}>
-                <Plot
-                  data={bottomFamiliasData}
-                  layout={layout}
-                  config={config}
-                  style={{ width: '100%', height: '100%' }}
-                />
-              </Box>
-            ) : (
-              <Typography color="text.secondary" textAlign="center" py={4}>
-                Nenhum dado disponível
+          {/* Cards de estatísticas modernos */}
+          <Grid size={{ xs: 12, lg: 4 }}>
+            <Box mb={3}>
+              <Typography 
+                variant="h6" 
+                fontWeight={600}
+                fontFamily="'Inter', sans-serif"
+                color="text.primary"
+                gutterBottom
+              >
+                Destaques por Empresa
               </Typography>
-            )}
-          </Grid>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                fontFamily="'Inter', sans-serif"
+              >
+                Maior e menor MTBF por família
+              </Typography>
+            </Box>
 
-          {/* Company Stats Cards */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" gutterBottom>
-              Estatísticas por Empresa
-            </Typography>
             <Grid container spacing={2}>
-              {data.companyStats.map((company) => (
-                <Grid item xs={12} sm={6} md={4} key={company.empresa}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        {company.empresa}
-                      </Typography>
-                      
-                      {company.highestMTBF && (
-                        <Box mb={2}>
-                          <Typography variant="body2" color="text.secondary">
-                            Maior MTBF:
-                          </Typography>
-                          <Chip
-                            label={`${company.highestMTBF.familia}: ${company.highestMTBF.mtbf.toFixed(1)}h`}
-                            color="success"
-                            size="small"
-                          />
-                        </Box>
-                      )}
-                      
-                      {company.lowestMTBF && (
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">
-                            Menor MTBF:
-                          </Typography>
-                          <Chip
-                            label={`${company.lowestMTBF.familia}: ${company.lowestMTBF.mtbf.toFixed(1)}h`}
-                            color="error"
-                            size="small"
-                          />
-                        </Box>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
+              {data.companyStats.slice(0, 4).map((company) => (
+                <React.Fragment key={company.empresa}>
+                  {company.highestMTBF && (
+                    <Grid size={{ xs: 12 }}>
+                      <StatCard
+                        company={company.empresa}
+                        label="Maior MTBF"
+                        value={company.highestMTBF.mtbf}
+                        familia={company.highestMTBF.familia}
+                        isHighest={true}
+                      />
+                    </Grid>
+                  )}
+                  {company.lowestMTBF && (
+                    <Grid size={{ xs: 12 }}>
+                      <StatCard
+                        company={company.empresa}
+                        label="Menor MTBF"
+                        value={company.lowestMTBF.mtbf}
+                        familia={company.lowestMTBF.familia}
+                        isHighest={false}
+                      />
+                    </Grid>
+                  )}
+                </React.Fragment>
               ))}
             </Grid>
+          </Grid>
+
+          {/* Gráficos de famílias lado a lado */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box mb={3}>
+              <Typography 
+                variant="h6" 
+                fontWeight={600}
+                fontFamily="'Inter', sans-serif"
+                color="text.primary"
+                gutterBottom
+              >
+                Top 5 Maiores MTBF
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                fontFamily="'Inter', sans-serif"
+              >
+                Famílias com melhor confiabilidade
+              </Typography>
+            </Box>
+            
+            {data.topFamilias.length > 0 ? (
+              <Box 
+                sx={{ 
+                  height: 280,
+                  bgcolor: `${colors.success}08`,
+                  borderRadius: 2,
+                  p: 2,
+                  border: `1px solid ${colors.success}15`
+                }}
+              >
+                <Plot
+                  data={topFamiliasData}
+                  layout={createLayout('MTBF (horas)')}
+                  config={config}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </Box>
+            ) : (
+              <Box 
+                sx={{ 
+                  height: 280,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: colors.neutral[50],
+                  borderRadius: 2
+                }}
+              >
+                <Typography 
+                  color="text.secondary" 
+                  fontFamily="'Inter', sans-serif"
+                >
+                  Nenhum dado disponível
+                </Typography>
+              </Box>
+            )}
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box mb={3}>
+              <Typography 
+                variant="h6" 
+                fontWeight={600}
+                fontFamily="'Inter', sans-serif"
+                color="text.primary"
+                gutterBottom
+              >
+                Top 5 Menores MTBF
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                fontFamily="'Inter', sans-serif"
+              >
+                Famílias que precisam de atenção
+              </Typography>
+            </Box>
+            
+            {data.bottomFamilias.length > 0 ? (
+              <Box 
+                sx={{ 
+                  height: 280,
+                  bgcolor: `${colors.error}08`,
+                  borderRadius: 2,
+                  p: 2,
+                  border: `1px solid ${colors.error}15`
+                }}
+              >
+                <Plot
+                  data={bottomFamiliasData}
+                  layout={createLayout('MTBF (horas)')}
+                  config={config}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </Box>
+            ) : (
+              <Box 
+                sx={{ 
+                  height: 280,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: colors.neutral[50],
+                  borderRadius: 2
+                }}
+              >
+                <Typography 
+                  color="text.secondary" 
+                  fontFamily="'Inter', sans-serif"
+                >
+                  Nenhum dado disponível
+                </Typography>
+              </Box>
+            )}
           </Grid>
         </Grid>
       </CardContent>
