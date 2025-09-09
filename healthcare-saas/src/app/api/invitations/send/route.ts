@@ -32,12 +32,18 @@ async function sendInvitationEmail(inviteData: InviteData) {
           <h2 style="color: #333; margin: 0;">Convite para Acesso ao Sistema</h2>
         </div>
         
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4caf50;">
+          <p style="margin: 0 0 15px 0; font-size: 18px; font-weight: bold; color: #2e7d32;">
+            🎉 Bem-vindo ao GCINFRA 360°!
+          </p>
           <p style="margin: 0 0 15px 0; font-size: 16px;">Olá!</p>
           <p style="margin: 0 0 15px 0; font-size: 16px;">
-            Você foi convidado para se juntar ao sistema de gestão de infraestrutura 
-            <strong>360° - GCINFRA</strong> com o perfil de 
+            Você foi convidado para se juntar ao sistema de gestão inteligente de infraestrutura 
+            <strong>GCINFRA 360°</strong> com o perfil de 
             <strong>${inviteData.role === 'admin' ? 'Administrador' : 'Gerente'}</strong>.
+          </p>
+          <p style="margin: 0; font-size: 14px; color: #666; font-style: italic;">
+            Uma nova era na gestão de infraestrutura hospitalar te aguarda!
           </p>
         </div>
         
