@@ -20,7 +20,6 @@ import {
   Chip,
   useTheme,
   alpha,
-  Paper,
   Avatar
 } from '@mui/material'
 import {

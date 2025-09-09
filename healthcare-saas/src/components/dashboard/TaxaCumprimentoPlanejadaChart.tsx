@@ -162,7 +162,7 @@ export default function TaxaCumprimentoPlanejadaChart({
               y={overallAverage} 
               stroke="#9e9e9e" 
               strokeDasharray="5 5"
-              label={{ value: "Média Geral", position: "topLeft" }}
+              label={{ value: "Média Geral", position: "top" }}
             />
           </LineChart>
         </ResponsiveContainer>

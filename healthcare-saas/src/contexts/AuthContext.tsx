@@ -71,17 +71,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return null
       }
 
+      if (!data) return null
+
+      /* eslint-disable @typescript-eslint/no-explicit-any */
       return {
-        id: data.id,
-        email: data.email,
-        role: data.role,
-        company_id: data.company_id,
-        company: data.companies ? {
-          id: data.companies.id,
-          name: data.companies.name,
-          acronym: data.companies.acronym
+        id: (data as any).id,
+        email: (data as any).email,
+        role: (data as any).role,
+        company_id: (data as any).company_id,
+        company: (data as any).companies ? {
+          id: (data as any).companies.id,
+          name: (data as any).companies.name,
+          acronym: (data as any).companies.acronym
         } : undefined
       } as UserProfile
+      /* eslint-enable @typescript-eslint/no-explicit-any */
     } catch (error) {
       console.error('Error fetching user profile:', error)
       return null

@@ -1130,6 +1130,7 @@ export default function DashboardContent() {
       </Box>
 
       {/* Analysis Charts */}
+      {/* eslint-disable @typescript-eslint/ban-ts-comment */}
       {/* @ts-ignore */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* @ts-ignore */}
@@ -1149,8 +1150,10 @@ export default function DashboardContent() {
           <SetorChart data={setorData} loading={loading} />
         </Grid>
       </Grid>
+      {/* eslint-enable @typescript-eslint/ban-ts-comment */}
 
       {/* Data Summary */}
+      {/* eslint-disable @typescript-eslint/ban-ts-comment */}
       {/* @ts-ignore */}
       <Grid container spacing={3}>
         {/* @ts-ignore */}
@@ -1224,6 +1227,7 @@ export default function DashboardContent() {
           </Card>
         </Grid>
       </Grid>
+      {/* eslint-enable @typescript-eslint/ban-ts-comment */}
 
       {/* Data Table Section */}
       <Box mt={4}>

@@ -47,7 +47,7 @@ export default function EquipmentCountByCompanyChart({ data, loading }: Props) {
           width: 2
         }
       },
-      textinfo: 'label+percent',
+      textinfo: 'label+percent' as const,
       textposition: 'auto' as const,
       hovertemplate: '<b>%{label}</b><br>' +
                      'Equipamentos: %{value}<br>' +

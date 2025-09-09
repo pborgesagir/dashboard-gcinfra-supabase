@@ -107,7 +107,7 @@ export default function SetorChart({ data, loading, chartType = 'bar' }: SetorCh
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px' }}
-          hide
+          content={() => null}
         />
         
         <Bar

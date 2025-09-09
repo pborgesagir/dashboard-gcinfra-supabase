@@ -107,7 +107,7 @@ export default function FamiliaChart({ data, loading, chartType = 'bar' }: Famil
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px' }}
-          hide
+          content={() => null}
         />
         
         <Bar

@@ -107,7 +107,7 @@ export default function TipoManutencaoChart({ data, loading, chartType = 'bar' }
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px' }}
-          hide
+          content={() => null}
         />
         
         <Bar

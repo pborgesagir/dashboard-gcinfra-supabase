@@ -10,9 +10,6 @@ import {
   Alert,
   SelectChangeEvent,
   Button,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   FormControl,
   InputLabel,
   Select,
@@ -23,7 +20,6 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { ptBR } from 'date-fns/locale'
 import { 
-  ExpandMore as ExpandMoreIcon,
   Download as DownloadIcon
 } from '@mui/icons-material'
 import { useAuth } from '@/contexts/AuthContext'

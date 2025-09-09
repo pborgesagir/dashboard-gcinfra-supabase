@@ -160,7 +160,7 @@ export default function ResponseTimeTrendChart({ data, loading }: ResponseTimeTr
               y={overallAverageHours} 
               stroke="#9e9e9e" 
               strokeDasharray="5 5"
-              label={{ value: "Média Geral", position: "topRight" }}
+              label={{ value: "Média Geral", position: "top" }}
             />
           </LineChart>
         </ResponsiveContainer>

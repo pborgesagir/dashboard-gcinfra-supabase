@@ -72,14 +72,6 @@ export default function CompanyStatusGauges({ data, loading }: Props) {
     responsive: true
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Abertas': return '#f44336'
-      case 'Fechadas': return '#4caf50'
-      case 'Pendentes': return '#ff9800'
-      default: return '#gray'
-    }
-  }
 
   const createLegend = (company: CompanyStatusData) => {
     const statusData = [

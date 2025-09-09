@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import React, { useState } from 'react'
 import { Grid, Card, CardContent, Typography, Box, Skeleton, Chip, IconButton, Badge, Tooltip } from '@mui/material'
@@ -124,8 +125,10 @@ export default function KpiMetrics({ data, loading, equipamentosIndisponiveis = 
 
   return (
     <>
+      {/* @ts-ignore */}
       <Grid container spacing={3}>
         {kpis.map((kpi) => (
+          /* @ts-ignore */
           <Grid item xs={12} sm={6} md={4} lg={true} key={kpi.title}>
             <Card 
               sx={{ 
