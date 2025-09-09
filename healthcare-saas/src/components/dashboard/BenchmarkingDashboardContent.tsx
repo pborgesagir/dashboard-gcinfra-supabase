@@ -5,6 +5,8 @@ import {
   Box, 
   Typography, 
   Grid,
+  Card,
+  CardContent,
   Alert,
   SelectChangeEvent,
   Button,
@@ -845,21 +847,11 @@ export default function BenchmarkingDashboardContent() {
 
         {/* Export Section */}
         <Box mt={4}>
-          <Accordion>
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              aria-controls="export-content"
-              id="export-header"
-              sx={{
-                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                '&:hover': { 
-                  bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'
-                }
-              }}
-            >
-              <Box display="flex" alignItems="center" gap={2} width="100%">
-                <Box flexGrow={1}>
-                  <Typography variant="h6">
+          <Card variant="outlined">
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
                     Exportador de Dados Filtrados
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -867,26 +859,17 @@ export default function BenchmarkingDashboardContent() {
                   </Typography>
                 </Box>
                 <Button
+                  variant="contained"
                   size="small"
                   startIcon={<DownloadIcon />}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    exportToCSV()
-                  }}
+                  onClick={exportToCSV}
                   disabled={filteredData.length === 0}
                 >
                   Exportar CSV
                 </Button>
               </Box>
-            </AccordionSummary>
-            
-            <AccordionDetails>
-              <Typography color="text.secondary">
-                O arquivo CSV incluirá todos os dados filtrados atualmente visíveis no dashboard, 
-                permitindo análises mais detalhadas em ferramentas externas como Excel ou Power BI.
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
+            </CardContent>
+          </Card>
         </Box>
       </Box>
     </LocalizationProvider>
