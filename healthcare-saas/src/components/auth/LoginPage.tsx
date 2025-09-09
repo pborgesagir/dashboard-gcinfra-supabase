@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Box,
   TextField,
@@ -15,112 +15,123 @@ import {
   IconButton,
   Paper,
   useTheme,
-  alpha
-} from '@mui/material'
-import Image from 'next/image'
-import { 
-  Visibility, 
-  VisibilityOff, 
+  alpha,
+} from "@mui/material";
+import Image from "next/image";
+import {
+  Visibility,
+  VisibilityOff,
   LocalHospital,
   Security,
   Analytics,
-  Engineering
-} from '@mui/icons-material'
+  Engineering,
+} from "@mui/icons-material";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  
-  const { signInWithEmail } = useAuth()
-  const router = useRouter()
-  const theme = useTheme()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const { signInWithEmail } = useAuth();
+  const router = useRouter();
+  const theme = useTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
     try {
-      const { error } = await signInWithEmail(email, password)
-      
+      const { error } = await signInWithEmail(email, password);
+
       if (error) {
-        setError(error.message)
+        setError(error.message);
       } else {
-        router.push('/dashboard')
+        router.push("/dashboard");
       }
     } catch {
-      setError('Ocorreu um erro inesperado')
+      setError("Ocorreu um erro inesperado");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Professional color palette for healthcare infrastructure
   const gradientColors = {
     light: {
-      primary: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-      secondary: 'linear-gradient(135deg, #00695c 0%, #004d40 100%)',
-      accent: 'linear-gradient(135deg, #0277bd 0%, #01579b 100%)'
+      primary: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+      secondary: "linear-gradient(135deg, #00695c 0%, #004d40 100%)",
+      accent: "linear-gradient(135deg, #0277bd 0%, #01579b 100%)",
     },
     dark: {
-      primary: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-      secondary: 'linear-gradient(135deg, #00695c 0%, #004d40 100%)',
-      accent: 'linear-gradient(135deg, #0277bd 0%, #01579b 100%)'
-    }
-  }
+      primary: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+      secondary: "linear-gradient(135deg, #00695c 0%, #004d40 100%)",
+      accent: "linear-gradient(135deg, #0277bd 0%, #01579b 100%)",
+    },
+  };
 
-  const currentGradients = theme.palette.mode === 'dark' ? gradientColors.dark : gradientColors.light
+  const currentGradients =
+    theme.palette.mode === "dark" ? gradientColors.dark : gradientColors.light;
 
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        background: theme.palette.mode === 'dark' 
-          ? 'linear-gradient(135deg, #0a1628 0%, #1e293b 50%, #0f172a 100%)'
-          : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-        position: 'relative',
-        overflow: 'hidden'
+        minHeight: "100vh",
+        display: "flex",
+        background:
+          theme.palette.mode === "dark"
+            ? "linear-gradient(135deg, #0a1628 0%, #1e293b 50%, #0f172a 100%)"
+            : "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       {/* Background geometric pattern for 360° concept */}
       <Box
         sx={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           background: `
-            radial-gradient(circle at 20% 20%, ${alpha(theme.palette.primary.main, 0.1)} 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, ${alpha(theme.palette.secondary.main, 0.1)} 0%, transparent 50%),
-            radial-gradient(circle at 40% 60%, ${alpha(theme.palette.primary.main, 0.05)} 0%, transparent 50%)
+            radial-gradient(circle at 20% 20%, ${alpha(
+              theme.palette.primary.main,
+              0.1
+            )} 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, ${alpha(
+              theme.palette.secondary.main,
+              0.1
+            )} 0%, transparent 50%),
+            radial-gradient(circle at 40% 60%, ${alpha(
+              theme.palette.primary.main,
+              0.05
+            )} 0%, transparent 50%)
           `,
-          '&::before': {
+          "&::before": {
             content: '""',
-            position: 'absolute',
-            top: '10%',
-            right: '10%',
-            width: '300px',
-            height: '300px',
+            position: "absolute",
+            top: "10%",
+            right: "10%",
+            width: "300px",
+            height: "300px",
             border: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-            borderRadius: '50%',
-            transform: 'rotate(45deg)'
+            borderRadius: "50%",
+            transform: "rotate(45deg)",
           },
-          '&::after': {
+          "&::after": {
             content: '""',
-            position: 'absolute',
-            bottom: '15%',
-            left: '5%',
-            width: '200px',
-            height: '200px',
+            position: "absolute",
+            bottom: "15%",
+            left: "5%",
+            width: "200px",
+            height: "200px",
             border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
-            borderRadius: '50%',
-            transform: 'rotate(-45deg)'
-          }
+            borderRadius: "50%",
+            transform: "rotate(-45deg)",
+          },
         }}
       />
 
@@ -128,124 +139,127 @@ export default function LoginPage() {
       <Box
         sx={{
           flex: { xs: 0, md: 1 },
-          display: { xs: 'none', md: 'flex' },
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
+          display: { xs: "none", md: "flex" },
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
           px: 8,
           py: 6,
-          position: 'relative',
+          position: "relative",
           background: currentGradients.primary,
-          color: 'white'
+          color: "white",
         }}
       >
         {/* 360° Visual Element */}
         <Box
           sx={{
-            position: 'relative',
+            position: "relative",
             mb: 6,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           {/* Rotating rings for 360° concept */}
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               width: 180,
               height: 180,
-              border: '2px solid rgba(255,255,255,0.2)',
-              borderRadius: '50%',
-              animation: 'rotate 20s linear infinite',
-              borderTopColor: 'rgba(255,255,255,0.8)',
-              '@keyframes rotate': {
-                '0%': { transform: 'rotate(0deg)' },
-                '100%': { transform: 'rotate(360deg)' }
-              }
+              border: "2px solid rgba(255,255,255,0.2)",
+              borderRadius: "50%",
+              animation: "rotate 20s linear infinite",
+              borderTopColor: "rgba(255,255,255,0.8)",
+              "@keyframes rotate": {
+                "0%": { transform: "rotate(0deg)" },
+                "100%": { transform: "rotate(360deg)" },
+              },
             }}
           />
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               width: 140,
               height: 140,
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '50%',
-              animation: 'rotateReverse 15s linear infinite',
-              borderBottomColor: 'rgba(255,255,255,0.6)',
-              '@keyframes rotateReverse': {
-                '0%': { transform: 'rotate(0deg)' },
-                '100%': { transform: 'rotate(-360deg)' }
-              }
+              border: "1px solid rgba(255,255,255,0.3)",
+              borderRadius: "50%",
+              animation: "rotateReverse 15s linear infinite",
+              borderBottomColor: "rgba(255,255,255,0.6)",
+              "@keyframes rotateReverse": {
+                "0%": { transform: "rotate(0deg)" },
+                "100%": { transform: "rotate(-360deg)" },
+              },
             }}
           />
-          <Image 
-            src="/logodaagir.png" 
-            alt="360° - GCINFRA Logo" 
-            width={80} 
+          <Image
+            src="/logodaagir.png"
+            alt="360° - GCINFRA Logo"
+            width={80}
             height={80}
-            style={{ 
-              objectFit: 'contain',
-              filter: 'brightness(0) invert(1)',
-              position: 'relative',
-              zIndex: 1
+            style={{
+              objectFit: "contain",
+              filter: "brightness(0) invert(1)",
+              position: "relative",
+              zIndex: 1,
             }}
           />
         </Box>
 
         <Typography variant="h3" fontWeight="bold" mb={2} textAlign="center">
-          360° - GCINFRA
+          GCINFRA 360°
         </Typography>
-        
-        <Typography variant="h6" mb={6} textAlign="center" sx={{ opacity: 0.9 }}>
+
+        <Typography
+          variant="h6"
+          mb={6}
+          textAlign="center"
+          sx={{ opacity: 0.9 }}
+        >
           Gestão Inteligente de Infraestrutura Hospitalar
         </Typography>
 
         {/* Feature highlights */}
-        <Box sx={{ width: '100%', maxWidth: 400 }}>
+        <Box sx={{ width: "100%", maxWidth: 400 }}>
           {[
             {
               icon: <LocalHospital sx={{ fontSize: 32 }} />,
-              title: 'Infraestrutura Hospitalar',
-              desc: 'Gestão completa de equipamentos médicos e prediais'
+              title: "Infraestrutura Hospitalar",
+              desc: "Gestão completa de equipamentos médicos e prediais",
             },
             {
               icon: <Analytics sx={{ fontSize: 32 }} />,
-              title: 'Análise 360°',
-              desc: 'Visão completa dos dados de manutenção e performance'
+              title: "Análise 360°",
+              desc: "Visão completa dos dados de manutenção e performance",
             },
             {
               icon: <Security sx={{ fontSize: 32 }} />,
-              title: 'Conformidade',
-              desc: 'Atendimento a normas técnicas e regulatórias'
+              title: "Conformidade",
+              desc: "Atendimento a normas técnicas e regulatórias",
             },
             {
               icon: <Engineering sx={{ fontSize: 32 }} />,
-              title: 'Engenharia Clínica',
-              desc: 'Gestão especializada de tecnologia médica'
-            }
+              title: "Engenharia Predial e Clínica",
+              desc: "Tecnologia aliada à gestão",
+            },
           ].map((feature, index) => (
-            <Box 
+            <Box
               key={index}
               sx={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 mb: 3,
                 p: 2,
                 borderRadius: 2,
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  background: 'rgba(255,255,255,0.15)',
-                  transform: 'translateX(10px)'
-                }
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(10px)",
+                transition: "all 0.3s ease",
+                "&:hover": {
+                  background: "rgba(255,255,255,0.15)",
+                  transform: "translateX(10px)",
+                },
               }}
             >
-              <Box sx={{ mr: 3, opacity: 0.9 }}>
-                {feature.icon}
-              </Box>
+              <Box sx={{ mr: 3, opacity: 0.9 }}>{feature.icon}</Box>
               <Box>
                 <Typography variant="subtitle1" fontWeight="bold" mb={0.5}>
                   {feature.title}
@@ -263,68 +277,68 @@ export default function LoginPage() {
       <Box
         sx={{
           flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           px: { xs: 3, sm: 6, md: 8 },
           py: 6,
-          position: 'relative'
+          position: "relative",
         }}
       >
         <Container maxWidth="sm">
           {/* Mobile Logo */}
           <Box
             sx={{
-              display: { xs: 'flex', md: 'none' },
-              flexDirection: 'column',
-              alignItems: 'center',
-              mb: 6
+              display: { xs: "flex", md: "none" },
+              flexDirection: "column",
+              alignItems: "center",
+              mb: 6,
             }}
           >
             <Box
               sx={{
-                position: 'relative',
+                position: "relative",
                 mb: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               <Box
                 sx={{
-                  position: 'absolute',
+                  position: "absolute",
                   width: 100,
                   height: 100,
                   border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-                  borderRadius: '50%',
-                  animation: 'rotate 20s linear infinite',
+                  borderRadius: "50%",
+                  animation: "rotate 20s linear infinite",
                   borderTopColor: theme.palette.primary.main,
-                  '@keyframes rotate': {
-                    '0%': { transform: 'rotate(0deg)' },
-                    '100%': { transform: 'rotate(360deg)' }
-                  }
+                  "@keyframes rotate": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
                 }}
               />
-              <Image 
-                src="/logodaagir.png" 
-                alt="360° - GCINFRA Logo" 
-                width={60} 
+              <Image
+                src="/logodaagir.png"
+                alt="360° - GCINFRA Logo"
+                width={60}
                 height={60}
-                style={{ objectFit: 'contain' }}
+                style={{ objectFit: "contain" }}
               />
             </Box>
-            <Typography 
-              variant="h4" 
-              fontWeight="bold" 
-              color="primary.main" 
+            <Typography
+              variant="h4"
+              fontWeight="bold"
+              color="primary.main"
               textAlign="center"
               mb={1}
             >
               360° - GCINFRA
             </Typography>
-            <Typography 
-              variant="body2" 
-              color="text.secondary" 
+            <Typography
+              variant="body2"
+              color="text.secondary"
               textAlign="center"
               sx={{ opacity: 0.8 }}
             >
@@ -339,9 +353,9 @@ export default function LoginPage() {
               p: { xs: 4, sm: 6 },
               borderRadius: 3,
               background: alpha(theme.palette.background.paper, 0.9),
-              backdropFilter: 'blur(20px)',
+              backdropFilter: "blur(20px)",
               border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`
+              boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
             }}
           >
             <Box textAlign="center" mb={4}>
@@ -354,14 +368,14 @@ export default function LoginPage() {
             </Box>
 
             {error && (
-              <Alert 
-                severity="error" 
-                sx={{ 
+              <Alert
+                severity="error"
+                sx={{
                   mb: 3,
                   borderRadius: 2,
-                  '& .MuiAlert-message': {
-                    width: '100%'
-                  }
+                  "& .MuiAlert-message": {
+                    width: "100%",
+                  },
                 }}
               >
                 {error}
@@ -376,39 +390,39 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                sx={{ 
+                sx={{
                   mb: 3,
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 2,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: theme.palette.primary.main
-                      }
-                    }
-                  }
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: theme.palette.primary.main,
+                      },
+                    },
+                  },
                 }}
                 placeholder="seu@email.com.br"
               />
-              
+
               <TextField
                 fullWidth
                 label="Senha"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                sx={{ 
+                sx={{
                   mb: 4,
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 2,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: theme.palette.primary.main
-                      }
-                    }
-                  }
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: theme.palette.primary.main,
+                      },
+                    },
+                  },
                 }}
                 InputProps={{
                   endAdornment: (
@@ -418,10 +432,10 @@ export default function LoginPage() {
                         onClick={() => setShowPassword(!showPassword)}
                         edge="end"
                         sx={{
-                          color: 'text.secondary',
-                          '&:hover': {
-                            color: 'primary.main'
-                          }
+                          color: "text.secondary",
+                          "&:hover": {
+                            color: "primary.main",
+                          },
                         }}
                       >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
@@ -431,30 +445,36 @@ export default function LoginPage() {
                 }}
                 placeholder="••••••••"
               />
-              
+
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
                 size="large"
                 disabled={loading}
-                sx={{ 
+                sx={{
                   py: 1.5,
                   borderRadius: 2,
                   background: currentGradients.primary,
                   fontWeight: 600,
-                  fontSize: '1rem',
-                  textTransform: 'none',
-                  boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-                  '&:hover': {
+                  fontSize: "1rem",
+                  textTransform: "none",
+                  boxShadow: `0 4px 16px ${alpha(
+                    theme.palette.primary.main,
+                    0.3
+                  )}`,
+                  "&:hover": {
                     background: currentGradients.accent,
-                    boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
-                    transform: 'translateY(-2px)'
+                    boxShadow: `0 8px 24px ${alpha(
+                      theme.palette.primary.main,
+                      0.4
+                    )}`,
+                    transform: "translateY(-2px)",
                   },
-                  '&:disabled': {
-                    background: alpha(theme.palette.action.disabled, 0.3)
+                  "&:disabled": {
+                    background: alpha(theme.palette.action.disabled, 0.3),
                   },
-                  transition: 'all 0.3s ease'
+                  transition: "all 0.3s ease",
                 }}
               >
                 {loading ? (
@@ -463,7 +483,7 @@ export default function LoginPage() {
                     <span>Autenticando...</span>
                   </Box>
                 ) : (
-                  'Acessar Sistema'
+                  "Acessar Sistema"
                 )}
               </Button>
             </form>
@@ -472,7 +492,11 @@ export default function LoginPage() {
               <Typography variant="body2" color="text.secondary" mb={1}>
                 Precisa de acesso ao sistema?
               </Typography>
-              <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
+              <Typography
+                variant="body2"
+                color="primary.main"
+                sx={{ fontWeight: 500 }}
+              >
                 Entre em contato com o administrador
               </Typography>
             </Box>
@@ -481,11 +505,12 @@ export default function LoginPage() {
           {/* Footer */}
           <Box mt={4} textAlign="center">
             <Typography variant="caption" color="text.secondary">
-              © 2024 360° - GCINFRA. Gestão Inteligente de Infraestrutura Hospitalar.
+              © 2025 GCINFRA 360°. Gestão Inteligente de Infraestrutura
+              Hospitalar.
             </Typography>
           </Box>
         </Container>
       </Box>
     </Box>
-  )
+  );
 }
