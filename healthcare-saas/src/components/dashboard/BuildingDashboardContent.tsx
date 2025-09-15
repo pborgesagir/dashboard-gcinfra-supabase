@@ -57,6 +57,7 @@ interface FilterState {
   familia: string[]
   prioridade: string[]
   setor: string[]
+  oficina: string[]
   tipomanutencao: string[]
   situacao: string[]
   possuiChamado: string
@@ -69,6 +70,7 @@ export default function BuildingDashboardContent() {
     buildingLoading,
     buildingError,
     loadingProgress,
+    estimatedTimeRemaining,
     loadBuildingData
   } = useData()
   
@@ -83,6 +85,7 @@ export default function BuildingDashboardContent() {
     familia: [],
     prioridade: [],
     setor: [],
+    oficina: [],
     tipomanutencao: [],
     situacao: [],
     possuiChamado: 'Todos'
@@ -102,6 +105,7 @@ export default function BuildingDashboardContent() {
     familias: [...new Set(buildingData.map(item => item.familia).filter(Boolean))] as string[],
     prioridades: [...new Set(buildingData.map(item => item.prioridade).filter(Boolean))] as string[],
     setores: [...new Set(buildingData.map(item => item.setor).filter(Boolean))] as string[],
+    oficinas: [...new Set(buildingData.map(item => item.oficina).filter(Boolean))] as string[],
     tiposManutencao: [...new Set(buildingData.map(item => item.tipomanutencao).filter(Boolean))] as string[],
     situacoes: [...new Set(buildingData.map(item => item.situacao).filter(Boolean))] as string[]
   }
@@ -205,7 +209,7 @@ export default function BuildingDashboardContent() {
     setFilters(prev => ({ ...prev, [field]: event.target.value }))
   }
 
-  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'tipomanutencao' | 'situacao') => (
+  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'oficina' | 'tipomanutencao' | 'situacao') => (
     event: SelectChangeEvent<string[]>
   ) => {
     const value = event.target.value
@@ -226,6 +230,7 @@ export default function BuildingDashboardContent() {
       familia: [],
       prioridade: [],
       setor: [],
+      oficina: [],
       tipomanutencao: [],
       situacao: [],
       possuiChamado: 'Todos'
@@ -908,15 +913,24 @@ export default function BuildingDashboardContent() {
       )}
 
       {buildingLoading && loadingProgress && (
-        <Alert 
-          severity="info" 
-          sx={{ 
+        <Alert
+          severity="info"
+          sx={{
             mb: 3,
             position: 'relative',
             overflow: 'hidden'
           }}
         >
-          {loadingProgress}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="body2">
+              {loadingProgress}
+            </Typography>
+            {estimatedTimeRemaining && (
+              <Typography variant="caption" color="text.secondary">
+                {estimatedTimeRemaining}
+              </Typography>
+            )}
+          </Box>
           <LinearProgress
             sx={{
               position: 'absolute',

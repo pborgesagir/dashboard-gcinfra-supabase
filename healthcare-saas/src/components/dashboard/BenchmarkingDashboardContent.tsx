@@ -46,6 +46,7 @@ interface FilterState {
   familia: string[]
   prioridade: string[]
   setor: string[]
+  oficina: string[]
   tipomanutencao: string[]
   situacao: string[]
   possuiChamado: string
@@ -61,6 +62,7 @@ export default function BenchmarkingDashboardContent() {
     clinicalError,
     buildingError,
     loadingProgress,
+    estimatedTimeRemaining,
     loadClinicalData,
     loadBuildingData
   } = useData()
@@ -78,6 +80,7 @@ export default function BenchmarkingDashboardContent() {
     familia: [],
     prioridade: [],
     setor: [],
+    oficina: [],
     tipomanutencao: [],
     situacao: [],
     possuiChamado: 'Todos'
@@ -90,6 +93,7 @@ export default function BenchmarkingDashboardContent() {
     familias: [...new Set(allData.map(item => item.familia).filter(Boolean))] as string[],
     prioridades: [...new Set(allData.map(item => item.prioridade).filter(Boolean))] as string[],
     setores: [...new Set(allData.map(item => item.setor).filter(Boolean))] as string[],
+    oficinas: [...new Set(allData.map(item => item.oficina).filter(Boolean))] as string[],
     tiposManutencao: [...new Set(allData.map(item => item.tipomanutencao).filter(Boolean))] as string[],
     situacoes: [...new Set(allData.map(item => item.situacao).filter(Boolean))] as string[]
   }
@@ -178,13 +182,19 @@ export default function BenchmarkingDashboardContent() {
     }
 
     if (filters.setor.length > 0) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.setor && filters.setor.includes(item.setor)
       )
     }
 
+    if (filters.oficina.length > 0) {
+      filtered = filtered.filter(item =>
+        item.oficina && filters.oficina.includes(item.oficina)
+      )
+    }
+
     if (filters.tipomanutencao.length > 0) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.tipomanutencao && filters.tipomanutencao.includes(item.tipomanutencao)
       )
     }
@@ -218,7 +228,7 @@ export default function BenchmarkingDashboardContent() {
     setFilters(prev => ({ ...prev, [field]: event.target.value }))
   }
 
-  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'tipomanutencao' | 'situacao') => (
+  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'oficina' | 'tipomanutencao' | 'situacao') => (
     event: SelectChangeEvent<string[]>
   ) => {
     const value = event.target.value
@@ -239,6 +249,7 @@ export default function BenchmarkingDashboardContent() {
       familia: [],
       prioridade: [],
       setor: [],
+      oficina: [],
       tipomanutencao: [],
       situacao: [],
       possuiChamado: 'Todos'
@@ -748,15 +759,24 @@ export default function BenchmarkingDashboardContent() {
         )}
 
         {(clinicalLoading || buildingLoading) && loadingProgress && (
-          <Alert 
-            severity="info" 
-            sx={{ 
+          <Alert
+            severity="info"
+            sx={{
               mb: 3,
               position: 'relative',
               overflow: 'hidden'
             }}
           >
-            {loadingProgress}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Typography variant="body2">
+                {loadingProgress}
+              </Typography>
+              {estimatedTimeRemaining && (
+                <Typography variant="caption" color="text.secondary">
+                  {estimatedTimeRemaining}
+                </Typography>
+              )}
+            </Box>
             <LinearProgress
               sx={{
                 position: 'absolute',

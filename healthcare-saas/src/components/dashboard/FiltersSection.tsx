@@ -35,6 +35,7 @@ interface FilterState {
   familia: string[];
   prioridade: string[];
   setor: string[];
+  oficina: string[];
   tipomanutencao: string[];
   situacao: string[];
   possuiChamado: string;
@@ -46,6 +47,7 @@ interface FilterOptions {
   familias: string[];
   prioridades: string[];
   setores: string[];
+  oficinas: string[];
   tiposManutencao: string[];
   situacoes: string[];
 }
@@ -75,6 +77,7 @@ interface FiltersSectionProps {
       | "familia"
       | "prioridade"
       | "setor"
+      | "oficina"
       | "tipomanutencao"
       | "situacao"
   ) => (event: SelectChangeEvent<string[]>) => void;
@@ -101,6 +104,7 @@ export default function FiltersSection({
     if (filters.familia.length > 0) count++;
     if (filters.prioridade.length > 0) count++;
     if (filters.setor.length > 0) count++;
+    if (filters.oficina.length > 0) count++;
     if (filters.tipomanutencao.length > 0) count++;
     if (filters.situacao.length > 0) count++;
     if (filters.possuiChamado !== "Todos") count++;
@@ -115,6 +119,7 @@ export default function FiltersSection({
       | "familia"
       | "prioridade"
       | "setor"
+      | "oficina"
       | "tipomanutencao"
       | "situacao"
     >,
@@ -370,6 +375,13 @@ export default function FiltersSection({
               Setores
             </Typography>
             {renderMultiSelect("setor", filterOptions.setores, "#2196f3")}
+          </Grid>
+          {/* @ts-ignore */}
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Typography variant="caption" display="block" gutterBottom>
+              Oficinas
+            </Typography>
+            {renderMultiSelect("oficina", filterOptions.oficinas, "#00bcd4")}
           </Grid>
           {/* @ts-ignore */}
           <Grid item xs={12} sm={6} md={2.4}>

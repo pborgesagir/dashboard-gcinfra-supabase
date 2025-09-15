@@ -162,7 +162,15 @@ export default function EquipamentosIndisponiveisModal({
           </Box>
         ) : (
           <Stack spacing={2}>
-            {equipamentos.map((equipamento) => (
+            {equipamentos
+              .slice()
+              .sort((a, b) => {
+                if (!a.data_chamado || !b.data_chamado) return 0;
+                const timeA = differenceInHours(new Date(), new Date(a.data_chamado));
+                const timeB = differenceInHours(new Date(), new Date(b.data_chamado));
+                return timeB - timeA; // Descending order (maior tempo primeiro)
+              })
+              .map((equipamento) => (
               <Card
                 key={equipamento.id}
                 elevation={2}

@@ -14,6 +14,7 @@ export interface MaintenanceOrder {
   fechamento: string | null
   prioridade: string | null
   setor: string | null
+  oficina: string | null
   tipomanutencao: string | null
   data_chamado: string | null
   data_atendimento: string | null
@@ -39,6 +40,7 @@ interface DataState {
   clinicalLoaded: boolean
   buildingLoaded: boolean
   loadingProgress: string
+  estimatedTimeRemaining: string
 }
 
 interface DataContextType extends DataState {
@@ -65,7 +67,8 @@ export function DataProvider({ children }: DataProviderProps) {
     buildingError: null,
     clinicalLoaded: false,
     buildingLoaded: false,
-    loadingProgress: ''
+    loadingProgress: '',
+    estimatedTimeRemaining: ''
   })
 
   const updateState = useCallback((updates: Partial<DataState>) => {
@@ -74,7 +77,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
   const fetchDataWithPagination = useCallback(async (
     table: 'maintenance_orders' | 'building_orders',
-    onProgress: (progress: string) => void
+    onProgress: (progress: string, timeEstimate: string) => void
   ): Promise<MaintenanceOrder[]> => {
     let query = supabase
       .from(table)
@@ -90,20 +93,63 @@ export function DataProvider({ children }: DataProviderProps) {
     let from = 0
     const batchSize = 1000
     let hasMore = true
+    const startTime = Date.now()
 
     while (hasMore) {
       const dataType = table === 'maintenance_orders' ? 'clínicos' : 'prediais'
-      onProgress(`Carregando dados ${dataType}: ${allOrders.length.toLocaleString()} registros...`)
-      
       const { data: batch, error } = await query.range(from, from + batchSize - 1)
-      
+
       if (error) throw error
-      
+
       if (batch && batch.length > 0) {
         allOrders = allOrders.concat(batch)
         from += batchSize
         hasMore = batch.length === batchSize
-        
+
+        // Calculate time estimation after processing the batch
+        const currentTime = Date.now()
+        const elapsedTime = currentTime - startTime
+        let timeEstimate = ''
+
+        if (allOrders.length > 0 && elapsedTime > 1000) { // Only estimate after 1 second
+          const recordsProcessed = allOrders.length
+          const batchesProcessed = Math.ceil(recordsProcessed / batchSize)
+
+          if (hasMore && batchesProcessed >= 2) {
+            // Simple approach: assume we're about 30-70% done based on consistent batch sizes
+            // This provides a reasonable decreasing estimate
+            const avgTimePerBatch = elapsedTime / batchesProcessed
+
+            // Estimate remaining batches based on typical patterns
+            // If we're getting consistent full batches, assume 2-5 more batches
+            let estimatedBatchesRemaining = Math.max(1, Math.floor(batchesProcessed * 0.4))
+
+            // Cap the estimate to prevent unrealistic times
+            estimatedBatchesRemaining = Math.min(estimatedBatchesRemaining, 8)
+
+            const estimatedRemainingTime = estimatedBatchesRemaining * avgTimePerBatch
+
+            if (estimatedBatchesRemaining <= 1 || batch.length < batchSize) {
+              timeEstimate = 'Quase concluído...'
+            } else if (estimatedRemainingTime > 60000) {
+              const minutes = Math.ceil(estimatedRemainingTime / 60000)
+              timeEstimate = `Faltam aproximadamente ${minutes}min`
+            } else if (estimatedRemainingTime > 3000) {
+              const seconds = Math.ceil(estimatedRemainingTime / 1000)
+              timeEstimate = `Faltam aproximadamente ${seconds}s`
+            } else {
+              timeEstimate = 'Quase concluído...'
+            }
+          } else if (hasMore) {
+            // Early estimation - just show that we're calculating
+            timeEstimate = 'Calculando tempo restante...'
+          } else {
+            timeEstimate = 'Quase concluído...'
+          }
+        }
+
+        onProgress(`Carregando dados ${dataType}: ${allOrders.length.toLocaleString()} registros...`, timeEstimate)
+
         // Add small delay for large datasets to prevent blocking UI
         if (allOrders.length > 10000) {
           await new Promise(resolve => setTimeout(resolve, 10))
@@ -138,14 +184,18 @@ export function DataProvider({ children }: DataProviderProps) {
     }
 
     try {
-      updateState({ 
-        clinicalLoading: true, 
-        clinicalError: null, 
-        loadingProgress: 'Iniciando carregamento de dados clínicos...' 
+      updateState({
+        clinicalLoading: true,
+        clinicalError: null,
+        loadingProgress: 'Iniciando carregamento de dados clínicos...',
+        estimatedTimeRemaining: ''
       })
 
-      const data = await fetchDataWithPagination('maintenance_orders', (progress) => {
-        updateState({ loadingProgress: progress })
+      const data = await fetchDataWithPagination('maintenance_orders', (progress, timeEstimate) => {
+        updateState({
+          loadingProgress: progress,
+          estimatedTimeRemaining: timeEstimate
+        })
       })
 
       updateState({
@@ -153,12 +203,13 @@ export function DataProvider({ children }: DataProviderProps) {
         clinicalLoading: false,
         clinicalLoaded: true,
         clinicalError: null,
-        loadingProgress: `Carregados ${data.length.toLocaleString()} registros clínicos com sucesso!`
+        loadingProgress: `Carregados ${data.length.toLocaleString()} registros clínicos com sucesso!`,
+        estimatedTimeRemaining: ''
       })
 
       // Clear progress message after 2 seconds
       setTimeout(() => {
-        updateState({ loadingProgress: '' })
+        updateState({ loadingProgress: '', estimatedTimeRemaining: '' })
       }, 2000)
 
       return data
@@ -167,7 +218,8 @@ export function DataProvider({ children }: DataProviderProps) {
       updateState({
         clinicalLoading: false,
         clinicalError: errorMessage,
-        loadingProgress: ''
+        loadingProgress: '',
+        estimatedTimeRemaining: ''
       })
       throw error
     }
@@ -195,14 +247,18 @@ export function DataProvider({ children }: DataProviderProps) {
     }
 
     try {
-      updateState({ 
-        buildingLoading: true, 
-        buildingError: null, 
-        loadingProgress: 'Iniciando carregamento de dados prediais...' 
+      updateState({
+        buildingLoading: true,
+        buildingError: null,
+        loadingProgress: 'Iniciando carregamento de dados prediais...',
+        estimatedTimeRemaining: ''
       })
 
-      const data = await fetchDataWithPagination('building_orders', (progress) => {
-        updateState({ loadingProgress: progress })
+      const data = await fetchDataWithPagination('building_orders', (progress, timeEstimate) => {
+        updateState({
+          loadingProgress: progress,
+          estimatedTimeRemaining: timeEstimate
+        })
       })
 
       updateState({
@@ -210,12 +266,13 @@ export function DataProvider({ children }: DataProviderProps) {
         buildingLoading: false,
         buildingLoaded: true,
         buildingError: null,
-        loadingProgress: `Carregados ${data.length.toLocaleString()} registros prediais com sucesso!`
+        loadingProgress: `Carregados ${data.length.toLocaleString()} registros prediais com sucesso!`,
+        estimatedTimeRemaining: ''
       })
 
       // Clear progress message after 2 seconds
       setTimeout(() => {
-        updateState({ loadingProgress: '' })
+        updateState({ loadingProgress: '', estimatedTimeRemaining: '' })
       }, 2000)
 
       return data
@@ -224,7 +281,8 @@ export function DataProvider({ children }: DataProviderProps) {
       updateState({
         buildingLoading: false,
         buildingError: errorMessage,
-        loadingProgress: ''
+        loadingProgress: '',
+        estimatedTimeRemaining: ''
       })
       throw error
     }
@@ -240,25 +298,28 @@ export function DataProvider({ children }: DataProviderProps) {
       buildingError: null,
       clinicalLoaded: false,
       buildingLoaded: false,
-      loadingProgress: ''
+      loadingProgress: '',
+      estimatedTimeRemaining: ''
     })
   }, [])
 
   const refreshData = useCallback(async (type: 'clinical' | 'building' | 'both' = 'both') => {
     if (type === 'clinical' || type === 'both') {
-      updateState({ 
-        clinicalLoaded: false, 
-        clinicalData: [], 
-        clinicalError: null 
+      updateState({
+        clinicalLoaded: false,
+        clinicalData: [],
+        clinicalError: null,
+        estimatedTimeRemaining: ''
       })
       await loadClinicalData()
     }
     
     if (type === 'building' || type === 'both') {
-      updateState({ 
-        buildingLoaded: false, 
-        buildingData: [], 
-        buildingError: null 
+      updateState({
+        buildingLoaded: false,
+        buildingData: [],
+        buildingError: null,
+        estimatedTimeRemaining: ''
       })
       await loadBuildingData()
     }

@@ -60,6 +60,7 @@ interface MaintenanceOrder {
   fechamento: string | null
   prioridade: string | null
   setor: string | null
+  oficina: string | null
   tipomanutencao: string | null
   data_chamado: string | null
   data_atendimento: string | null
@@ -85,6 +86,7 @@ interface FilterState {
   familia: string[]
   prioridade: string[]
   setor: string[]
+  oficina: string[]
   tipomanutencao: string[]
   situacao: string[]
   possuiChamado: string
@@ -108,6 +110,7 @@ export default function DashboardContent() {
     familia: [],
     prioridade: [],
     setor: [],
+    oficina: [],
     tipomanutencao: [],
     situacao: [],
     possuiChamado: 'Todos'
@@ -127,6 +130,7 @@ export default function DashboardContent() {
     familias: [...new Set(data.map(item => item.familia).filter(Boolean))] as string[],
     prioridades: [...new Set(data.map(item => item.prioridade).filter(Boolean))] as string[],
     setores: [...new Set(data.map(item => item.setor).filter(Boolean))] as string[],
+    oficinas: [...new Set(data.map(item => item.oficina).filter(Boolean))] as string[],
     tiposManutencao: [...new Set(data.map(item => item.tipomanutencao).filter(Boolean))] as string[],
     situacoes: [...new Set(data.map(item => item.situacao).filter(Boolean))] as string[]
   }
@@ -290,7 +294,7 @@ export default function DashboardContent() {
     setFilters(prev => ({ ...prev, [field]: event.target.value }))
   }
 
-  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'tipomanutencao' | 'situacao') => (
+  const handleMultiSelectChange = (field: 'empresa' | 'equipamento' | 'familia' | 'prioridade' | 'setor' | 'oficina' | 'tipomanutencao' | 'situacao') => (
     event: SelectChangeEvent<string[]>
   ) => {
     const value = event.target.value
@@ -311,6 +315,7 @@ export default function DashboardContent() {
       familia: [],
       prioridade: [],
       setor: [],
+      oficina: [],
       tipomanutencao: [],
       situacao: [],
       possuiChamado: 'Todos'

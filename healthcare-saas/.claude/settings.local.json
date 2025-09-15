@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx supabase db reset:*)"
+      "Bash(npx supabase db reset:*)",
+      "Bash(findstr:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx next:*)"
     ],
     "deny": [],
     "ask": []
