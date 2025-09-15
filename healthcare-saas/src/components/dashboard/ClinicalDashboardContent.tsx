@@ -70,7 +70,7 @@ export default function ClinicalDashboardContent() {
     clinicalLoading,
     clinicalError,
     loadingProgress,
-    estimatedTimeRemaining,
+    loadingPercentage,
     loadClinicalData
   } = useData()
   
@@ -925,13 +925,15 @@ export default function ClinicalDashboardContent() {
             <Typography variant="body2">
               {loadingProgress}
             </Typography>
-            {estimatedTimeRemaining && (
+            {loadingPercentage > 0 && (
               <Typography variant="caption" color="text.secondary">
-                {estimatedTimeRemaining}
+                {loadingPercentage}% concluído
               </Typography>
             )}
           </Box>
           <LinearProgress
+            variant={loadingPercentage > 0 ? "determinate" : "indeterminate"}
+            value={loadingPercentage}
             sx={{
               position: 'absolute',
               bottom: 0,

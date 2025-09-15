@@ -70,7 +70,7 @@ export default function BuildingDashboardContent() {
     buildingLoading,
     buildingError,
     loadingProgress,
-    estimatedTimeRemaining,
+    loadingPercentage,
     loadBuildingData
   } = useData()
   
@@ -925,13 +925,15 @@ export default function BuildingDashboardContent() {
             <Typography variant="body2">
               {loadingProgress}
             </Typography>
-            {estimatedTimeRemaining && (
+            {loadingPercentage > 0 && (
               <Typography variant="caption" color="text.secondary">
-                {estimatedTimeRemaining}
+                {loadingPercentage}% concluído
               </Typography>
             )}
           </Box>
           <LinearProgress
+            variant={loadingPercentage > 0 ? "determinate" : "indeterminate"}
+            value={loadingPercentage}
             sx={{
               position: 'absolute',
               bottom: 0,
