@@ -49,7 +49,7 @@ class MultiTenantMaintenanceDataExtractor:
             'company_id'
         ]
 
-        # CORRECTED: Dictionaries for case-insensitive mapping
+        # Dictionaries for case-insensitive mapping
         self.company_name_mapping = {}
         self.company_acronym_mapping = {}
         self.load_company_mapping()
@@ -74,15 +74,12 @@ class MultiTenantMaintenanceDataExtractor:
         
         lower_empresa_name = empresa_name.lower()
 
-        # 1. Check against the acronym mapping (most reliable)
         if lower_empresa_name in self.company_acronym_mapping:
             return self.company_acronym_mapping[lower_empresa_name]
 
-        # 2. Check against the full name mapping
         if lower_empresa_name in self.company_name_mapping:
             return self.company_name_mapping[lower_empresa_name]
 
-        # 3. If no match found, create a new company
         return self.create_company_if_not_exists(empresa_name)
 
     def create_company_if_not_exists(self, empresa_name: str) -> Optional[str]:
@@ -91,13 +88,11 @@ class MultiTenantMaintenanceDataExtractor:
             acronym = empresa_name.lower().replace(' ', '-').replace('ã', 'a').replace('ç', 'c')
             acronym = ''.join(c for c in acronym if c.isalnum() or c == '-')
 
-            # Case-insensitive check to see if acronym already exists
             existing_company = self.supabase.table('companies').select('id').ilike('acronym', acronym).execute()
             if existing_company.data:
                 logger.warning(f"Company with acronym '{acronym}' already exists. Using existing ID.")
                 return existing_company.data[0]['id']
 
-            # If it doesn't exist, create it
             result = self.supabase.table('companies').insert({
                 'name': empresa_name,
                 'acronym': acronym,
@@ -106,7 +101,6 @@ class MultiTenantMaintenanceDataExtractor:
             
             if result.data:
                 company_id = result.data[0]['id']
-                # Update local mappings immediately
                 self.company_name_mapping[empresa_name.lower()] = company_id
                 self.company_acronym_mapping[acronym] = company_id
                 logger.info(f"Created new company: '{empresa_name}' with ID: {company_id}")
@@ -185,7 +179,9 @@ class MultiTenantMaintenanceDataExtractor:
         for col in self.columns:
             if col not in df.columns:
                 df[col] = None
-        df = df[self.columns]
+        
+        # Adiciona .copy() para garantir que estamos trabalhando em um DataFrame independente
+        df = df[self.columns].copy() 
         
         date_columns = [
             'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento', 
@@ -193,10 +189,13 @@ class MultiTenantMaintenanceDataExtractor:
             'inicio_pendencia', 'fechamento_pendencia', 'cadastro', 'instalacao', 
             'garantia', 'verificacao'
         ]
+
         for col in date_columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
-            df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) else None)
-        
+            # Remove inplace=True e usa atribuição direta
+            df[col] = df[col].replace('', None)
+            temp_series = pd.to_datetime(df[col], errors='coerce')
+            df[col] = temp_series.dt.strftime('%Y-%m-%d %H:%M:%S').replace({pd.NaT: None})
+
         numeric_columns = ['custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno', 'qtd_mo_min']
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -217,7 +216,7 @@ class MultiTenantMaintenanceDataExtractor:
             batch_size = 100
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
-                self.supabase.table('maintenance_orders').upsert(batch, on_conflict='os').execute()
+                self.supabase.table('maintenance_orders').upsert(batch, on_conflict='os, company_id').execute()
                 logger.info(f"Upserted batch {i//batch_size + 1}/{len(records)//batch_size + 1}")
             logger.info(f"Successfully upserted {len(records)} records.")
             return True
@@ -238,7 +237,7 @@ class MultiTenantMaintenanceDataExtractor:
                 return False
             
             maintenance_df = pd.DataFrame(raw_maintenance_data)
-            maintenance_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
+            maintenance_df.drop_duplicates(subset=['os', 'empresa'], keep='last', inplace=True)
 
             equipment_df = self.fetch_equipment_data()
             merged_df = pd.merge(maintenance_df, equipment_df, on='tag', how='left') if not equipment_df.empty else maintenance_df
@@ -299,27 +298,23 @@ class MultiTenantBuildingEngineeringDataExtractor:
         if not empresa_name:
             return None
 
-        # Prioritize matching by the more specific razao_social if available
         name_to_check = razao_social if razao_social else empresa_name
         lower_name_to_check = name_to_check.lower()
 
-        # 1. Check against full name mapping
         if lower_name_to_check in self.company_name_mapping:
             return self.company_name_mapping[lower_name_to_check]
 
-        # 2. Check acronym from empresa_name
         lower_empresa_name = empresa_name.lower()
         if lower_empresa_name in self.company_acronym_mapping:
             return self.company_acronym_mapping[lower_empresa_name]
         
-        # 3. If no match, create it
         return self.create_company_from_building_data(empresa_name, razao_social)
 
     def create_company_from_building_data(self, empresa_name: str, razao_social: str = None) -> Optional[str]:
         """Create a new company, ensuring the acronym is unique (case-insensitive)."""
         try:
             company_name = razao_social if razao_social else empresa_name
-            acronym = empresa_name.lower() # Building data 'empresa' is the acronym
+            acronym = empresa_name.lower()
 
             existing_company = self.supabase.table('companies').select('id').ilike('acronym', acronym).execute()
             if existing_company.data:
@@ -380,15 +375,21 @@ class MultiTenantBuildingEngineeringDataExtractor:
         for col in self.building_columns:
             if col not in df.columns:
                 df[col] = None
-        df = df[self.building_columns]
+                
+        # Adiciona .copy() para garantir que estamos trabalhando em um DataFrame independente
+        df = df[self.building_columns].copy()
 
         date_columns = [
-            'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento', 
-            'data_solucao', 'data_chamado', 'data_inicial_mo', 'data_fim_mo', 
+            'abertura', 'parada', 'funcionamento', 'fechamento', 'data_atendimento',
+            'data_solucao', 'data_chamado', 'data_inicial_mo', 'data_fim_mo',
             'inicio_pendencia', 'fechamento_pendencia'
         ]
+        
         for col in date_columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S').replace({pd.NaT: None})
+            # Remove inplace=True e usa atribuição direta
+            df[col] = df[col].replace('', None)
+            temp_series = pd.to_datetime(df[col], errors='coerce')
+            df[col] = temp_series.dt.strftime('%Y-%m-%d %H:%M:%S').replace({pd.NaT: None})
 
         numeric_columns = ['empresa_id', 'situacao_int', 'custo_os', 'custo_mo', 'custo_peca', 'custo_servicoexterno', 'qtd_mo_min']
         for col in numeric_columns:
@@ -404,10 +405,12 @@ class MultiTenantBuildingEngineeringDataExtractor:
             return True
         try:
             records = df.to_dict('records')
-            batch_size = 100
+            # <<< ALTERAÇÃO AQUI >>>
+            # Reduzindo o tamanho do lote para evitar o timeout
+            batch_size = 50 
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
-                self.supabase.table('building_orders').upsert(batch, on_conflict='os').execute()
+                self.supabase.table('building_orders').upsert(batch, on_conflict='os, company_id').execute()
                 logger.info(f"Upserted building batch {i//batch_size + 1}")
             return True
         except Exception as e:
@@ -426,7 +429,7 @@ class MultiTenantBuildingEngineeringDataExtractor:
                 return False
 
             building_df = pd.DataFrame(raw_data)
-            building_df.drop_duplicates(subset=['os'], keep='last', inplace=True)
+            building_df.drop_duplicates(subset=['os', 'empresa'], keep='last', inplace=True)
             
             cleaned_df = self.clean_and_transform_building_data(building_df)
             return self.insert_building_data_to_supabase(cleaned_df)

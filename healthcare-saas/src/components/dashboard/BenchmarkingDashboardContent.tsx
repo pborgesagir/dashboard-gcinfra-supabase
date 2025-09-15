@@ -98,12 +98,21 @@ export default function BenchmarkingDashboardContent() {
     try {
       // Load data based on the current dataType
       if (dataType === 'clinical') {
+        console.log('Loading clinical data...')
         await loadClinicalData()
+        console.log('Clinical data loaded successfully')
       } else {
+        console.log('Loading building data...')
         await loadBuildingData()
+        console.log('Building data loaded successfully')
       }
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading data:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error: error,
+        dataType: dataType
+      })
     }
   }, [dataType, loadClinicalData, loadBuildingData])
 
