@@ -457,7 +457,7 @@ def main():
         print("✅ Building engineering data extraction completed successfully!")
     else:
         print("❌ Building engineering data extraction failed. Check logs.")
-    
+    read 
     if clinical_success and building_success:
         print("🎉 All data extractions completed successfully!")
     else:
