@@ -71,7 +71,10 @@ export default function ClinicalDashboardContent() {
     clinicalError,
     loadingProgress,
     loadingPercentage,
-    loadClinicalData
+    dataDateRange,
+    loadClinicalData,
+    refreshData,
+    loadAdditionalData
   } = useData()
   
   const [filteredData, setFilteredData] = useState<MaintenanceOrder[]>([])
@@ -318,22 +321,38 @@ export default function ClinicalDashboardContent() {
     applyFilters()
   }, [applyFilters])
 
-  // Calculate data range from all data (not filtered)
-  const dataRange = React.useMemo(() => {
-    const dates = clinicalData
-      .map(order => order.abertura)
-      .filter(date => date)
-      .map(date => new Date(date!))
-      .sort((a, b) => a.getTime() - b.getTime())
-    
-    if (dates.length >= 2) {
-      return {
-        start: dates[0],
-        end: dates[dates.length - 1]
-      }
+  // Handle loading older data when user requests dates outside current range
+  const handleLoadOlderData = useCallback(async (dateRange: { start: Date; end: Date }) => {
+    try {
+      await loadAdditionalData('clinical', dateRange);
+    } catch (error) {
+      console.error('Error loading additional data:', error);
     }
-    return null
-  }, [clinicalData])
+  }, [loadAdditionalData]);
+
+  // Handle period selection
+  const handlePeriodSelect = useCallback(async (period: 'month' | 'quarter' | 'semester') => {
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'quarter':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      case 'semester':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        break;
+    }
+
+    try {
+      await refreshData('clinical', { start: startDate, end: now });
+    } catch (error) {
+      console.error('Error loading period data:', error);
+    }
+  }, [refreshData]);
 
   // Process filtered data for KPIs - Same logic as original
   const kpiData = {
@@ -903,7 +922,9 @@ export default function ClinicalDashboardContent() {
           onSingleSelectChange={handleSingleSelectChange}
           onMultiSelectChange={handleMultiSelectChange}
           onClearFilters={clearFilters}
-          dataRange={dataRange}
+          dataRange={dataDateRange}
+          onLoadOlderData={handleLoadOlderData}
+          onPeriodSelect={handlePeriodSelect}
         />
 
       {clinicalError && (
@@ -1095,7 +1116,7 @@ export default function ClinicalDashboardContent() {
             id="data-table-header"
             sx={{
               bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              '&:hover': { 
+              '&:hover': {
                 bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'
               }
             }}
@@ -1110,19 +1131,37 @@ export default function ClinicalDashboardContent() {
                   Visualize e exporte os dados por trás dos gráficos
                 </Typography>
               </Box>
-              <Box display="flex" gap={1}>
-                <Button
-                  size="small"
-                  startIcon={<DownloadIcon />}
+              <Box display="flex" gap={1} alignItems="center">
+                <Box
+                  component="span"
                   onClick={(e) => {
                     e.stopPropagation()
-                    exportToCSV()
+                    if (filteredData.length > 0) {
+                      exportToCSV()
+                    }
                   }}
-                  disabled={filteredData.length === 0}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    backgroundColor: filteredData.length === 0 ? 'action.disabled' : 'primary.main',
+                    color: filteredData.length === 0 ? 'text.disabled' : 'primary.contrastText',
+                    cursor: filteredData.length === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    opacity: filteredData.length === 0 ? 0.6 : 1,
+                    '&:hover': {
+                      backgroundColor: filteredData.length === 0 ? 'action.disabled' : 'primary.dark',
+                    }
+                  }}
                 >
+                  <DownloadIcon fontSize="small" />
                   Exportar CSV
-                </Button>
-                <Chip 
+                </Box>
+                <Chip
                   label={filteredData.length.toLocaleString('pt-BR')}
                   size="small"
                   color="primary"

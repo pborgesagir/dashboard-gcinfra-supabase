@@ -68,10 +68,14 @@ export default function BuildingDashboardContent() {
   const {
     buildingData,
     buildingLoading,
+    buildingLoaded,
     buildingError,
     loadingProgress,
     loadingPercentage,
-    loadBuildingData
+    dataDateRange,
+    loadBuildingData,
+    refreshData,
+    loadAdditionalData
   } = useData()
   
   const [filteredData, setFilteredData] = useState<MaintenanceOrder[]>([])
@@ -112,7 +116,19 @@ export default function BuildingDashboardContent() {
 
   // Load building data when component mounts
   useEffect(() => {
-    loadBuildingData().catch(console.error)
+    console.log('🏗️ BuildingDashboardContent: Starting loadBuildingData...');
+    console.log('🏗️ buildingLoaded:', buildingLoaded, 'buildingLoading:', buildingLoading);
+    console.log('🏗️ buildingData length:', buildingData.length);
+    console.log('🏗️ dataDateRange:', dataDateRange);
+
+    loadBuildingData()
+      .then(() => {
+        console.log('🏗️ BuildingDashboardContent: loadBuildingData completed successfully');
+      })
+      .catch((error) => {
+        console.error('🏗️ BuildingDashboardContent: loadBuildingData failed:', error);
+        console.error('🏗️ Error details:', JSON.stringify(error, null, 2));
+      });
   }, [loadBuildingData])
 
   // Apply all filters to the data (same logic as clinical)
@@ -318,22 +334,38 @@ export default function BuildingDashboardContent() {
     applyFilters()
   }, [applyFilters])
 
-  // Calculate data range from all data (not filtered)
-  const dataRange = React.useMemo(() => {
-    const dates = buildingData
-      .map(order => order.abertura)
-      .filter(date => date)
-      .map(date => new Date(date!))
-      .sort((a, b) => a.getTime() - b.getTime())
-    
-    if (dates.length >= 2) {
-      return {
-        start: dates[0],
-        end: dates[dates.length - 1]
-      }
+  // Handle loading older data when user requests dates outside current range
+  const handleLoadOlderData = useCallback(async (dateRange: { start: Date; end: Date }) => {
+    try {
+      await loadAdditionalData('building', dateRange);
+    } catch (error) {
+      console.error('Error loading additional data:', error);
     }
-    return null
-  }, [buildingData])
+  }, [loadAdditionalData]);
+
+  // Handle period selection
+  const handlePeriodSelect = useCallback(async (period: 'month' | 'quarter' | 'semester') => {
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'quarter':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      case 'semester':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        break;
+    }
+
+    try {
+      await refreshData('building', { start: startDate, end: now });
+    } catch (error) {
+      console.error('Error loading period data:', error);
+    }
+  }, [refreshData]);
 
   // Process filtered data for KPIs - Same logic as clinical
   const kpiData = {
@@ -903,7 +935,9 @@ export default function BuildingDashboardContent() {
           onSingleSelectChange={handleSingleSelectChange}
           onMultiSelectChange={handleMultiSelectChange}
           onClearFilters={clearFilters}
-          dataRange={dataRange}
+          dataRange={dataDateRange}
+          onLoadOlderData={handleLoadOlderData}
+          onPeriodSelect={handlePeriodSelect}
         />
 
       {buildingError && (
@@ -1095,7 +1129,7 @@ export default function BuildingDashboardContent() {
             id="data-table-header"
             sx={{
               bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              '&:hover': { 
+              '&:hover': {
                 bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'
               }
             }}
@@ -1110,19 +1144,37 @@ export default function BuildingDashboardContent() {
                   Visualize e exporte os dados por trás dos gráficos
                 </Typography>
               </Box>
-              <Box display="flex" gap={1}>
-                <Button
-                  size="small"
-                  startIcon={<DownloadIcon />}
+              <Box display="flex" gap={1} alignItems="center">
+                <Box
+                  component="span"
                   onClick={(e) => {
                     e.stopPropagation()
-                    exportToCSV()
+                    if (filteredData.length > 0) {
+                      exportToCSV()
+                    }
                   }}
-                  disabled={filteredData.length === 0}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    backgroundColor: filteredData.length === 0 ? 'action.disabled' : 'primary.main',
+                    color: filteredData.length === 0 ? 'text.disabled' : 'primary.contrastText',
+                    cursor: filteredData.length === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    opacity: filteredData.length === 0 ? 0.6 : 1,
+                    '&:hover': {
+                      backgroundColor: filteredData.length === 0 ? 'action.disabled' : 'primary.dark',
+                    }
+                  }}
                 >
+                  <DownloadIcon fontSize="small" />
                   Exportar CSV
-                </Button>
-                <Chip 
+                </Box>
+                <Chip
                   label={filteredData.length.toLocaleString('pt-BR')}
                   size="small"
                   color="primary"

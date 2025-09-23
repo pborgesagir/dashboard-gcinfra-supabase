@@ -17,12 +17,15 @@ import {
   Tooltip,
   IconButton,
   Badge,
+  Button,
+  ButtonGroup,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { SelectChangeEvent } from "@mui/material/Select";
 import {
   FilterList as FilterListIcon,
   Clear as ClearIcon,
+  CloudDownload as CloudDownloadIcon,
 } from "@mui/icons-material";
 
 interface FilterState {
@@ -83,6 +86,8 @@ interface FiltersSectionProps {
   ) => (event: SelectChangeEvent<string[]>) => void;
   onClearFilters: () => void;
   dataRange: DataRange | null;
+  onLoadOlderData?: (dateRange: { start: Date; end: Date }) => void;
+  onPeriodSelect?: (period: 'month' | 'quarter' | 'semester') => void;
 }
 
 export default function FiltersSection({
@@ -93,6 +98,8 @@ export default function FiltersSection({
   onMultiSelectChange,
   onClearFilters,
   dataRange,
+  onLoadOlderData,
+  onPeriodSelect,
 }: FiltersSectionProps) {
   // Calculate active filters count
   const activeFiltersCount = React.useMemo(() => {
@@ -110,6 +117,44 @@ export default function FiltersSection({
     if (filters.possuiChamado !== "Todos") count++;
     return count;
   }, [filters]);
+
+  // Check if user is trying to access data outside current range
+  const needsOlderData = React.useMemo(() => {
+    if (!dataRange || !onLoadOlderData) return false;
+
+    const currentStart = dataRange.start;
+    const currentEnd = dataRange.end;
+
+    // Check if any date filter is outside the current range
+    if (filters.aberturaStartDate && filters.aberturaStartDate < currentStart) return true;
+    if (filters.aberturaEndDate && filters.aberturaEndDate < currentStart) return true;
+    if (filters.fechamentoStartDate && filters.fechamentoStartDate < currentStart) return true;
+    if (filters.fechamentoEndDate && filters.fechamentoEndDate < currentStart) return true;
+
+    return false;
+  }, [filters, dataRange, onLoadOlderData]);
+
+  // Calculate required date range for older data
+  const requiredDateRange = React.useMemo(() => {
+    if (!needsOlderData || !dataRange) return null;
+
+    const dates = [
+      filters.aberturaStartDate,
+      filters.aberturaEndDate,
+      filters.fechamentoStartDate,
+      filters.fechamentoEndDate
+    ].filter(date => date !== null) as Date[];
+
+    if (dates.length === 0) return null;
+
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+    return {
+      start: minDate < dataRange.start ? minDate : dataRange.start,
+      end: maxDate > dataRange.end ? maxDate : dataRange.end
+    };
+  }, [needsOlderData, dataRange, filters]);
 
   const renderMultiSelect = (
     field: keyof Pick<
@@ -253,7 +298,7 @@ export default function FiltersSection({
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {activeFiltersCount === 0
-                  ? `Nenhum filtro aplicado - mostrando todos os dados${
+                  ? `Mostrando dados${
                       dataRange
                         ? ` de ${dataRange.start.toLocaleDateString(
                             "pt-BR"
@@ -264,31 +309,55 @@ export default function FiltersSection({
                       activeFiltersCount === 1
                         ? "filtro ativo"
                         : "filtros ativos"
+                    }${
+                      dataRange
+                        ? ` - mostrando dados de ${dataRange.start.toLocaleDateString(
+                            "pt-BR"
+                          )} até ${dataRange.end.toLocaleDateString("pt-BR")}`
+                        : ""
                     }`}
               </Typography>
             </Box>
           </Box>
-          <Tooltip title="Limpar todos os filtros">
-            <IconButton
-              onClick={onClearFilters}
-              disabled={activeFiltersCount === 0}
-              sx={{
-                bgcolor:
-                  activeFiltersCount > 0 ? "error.main" : "action.disabled",
-                color: "white",
-                "&:hover": {
+          <Box display="flex" gap={1}>
+            {needsOlderData && requiredDateRange && (
+              <Tooltip title="Carregar dados mais antigos para as datas selecionadas">
+                <IconButton
+                  onClick={() => onLoadOlderData?.(requiredDateRange)}
+                  sx={{
+                    bgcolor: "warning.main",
+                    color: "white",
+                    "&:hover": {
+                      bgcolor: "warning.dark",
+                    },
+                  }}
+                >
+                  <CloudDownloadIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title="Limpar todos os filtros">
+              <IconButton
+                onClick={onClearFilters}
+                disabled={activeFiltersCount === 0}
+                sx={{
                   bgcolor:
-                    activeFiltersCount > 0 ? "error.dark" : "action.disabled",
-                },
-                "&:disabled": {
-                  bgcolor: "action.disabled",
-                  color: "action.disabled",
-                },
-              }}
-            >
-              <ClearIcon />
-            </IconButton>
-          </Tooltip>
+                    activeFiltersCount > 0 ? "error.main" : "action.disabled",
+                  color: "white",
+                  "&:hover": {
+                    bgcolor:
+                      activeFiltersCount > 0 ? "error.dark" : "action.disabled",
+                  },
+                  "&:disabled": {
+                    bgcolor: "action.disabled",
+                    color: "action.disabled",
+                  },
+                }}
+              >
+                <ClearIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
       </Box>
 
@@ -445,6 +514,68 @@ export default function FiltersSection({
               </Select>
             </FormControl>
           </Grid>
+
+          {/* Period Selection Buttons */}
+          {onPeriodSelect && (
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography variant="caption" display="block" gutterBottom>
+                Períodos Rápidos
+              </Typography>
+              <Box display="flex" gap={1} flexWrap="wrap">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => onPeriodSelect('month')}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: 'primary.main',
+                      color: 'white',
+                    }
+                  }}
+                >
+                  1M
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => onPeriodSelect('quarter')}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    borderColor: 'secondary.main',
+                    color: 'secondary.main',
+                    '&:hover': {
+                      backgroundColor: 'secondary.main',
+                      color: 'white',
+                    }
+                  }}
+                >
+                  3M
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => onPeriodSelect('semester')}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    borderColor: 'success.main',
+                    color: 'success.main',
+                    '&:hover': {
+                      backgroundColor: 'success.main',
+                      color: 'white',
+                    }
+                  }}
+                >
+                  6M
+                </Button>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </Box>
     </Paper>

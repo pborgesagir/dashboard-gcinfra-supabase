@@ -89,8 +89,8 @@ export default function HeatmapChart({ data, loading }: HeatmapChartProps) {
             
             {/* Heatmap cells */}
             {WEEKDAYS.map((day, dayIndex) => (
-              <>
-                <Box 
+              <Box key={`row-${dayIndex}`} sx={{ display: 'contents' }}>
+                <Box
                   key={`day-${dayIndex}`}
                   sx={{ 
                     display: 'flex', 
@@ -131,7 +131,7 @@ export default function HeatmapChart({ data, loading }: HeatmapChartProps) {
                     </Box>
                   )
                 })}
-              </>
+              </Box>
             ))}
           </Box>
           

@@ -63,8 +63,10 @@ export default function BenchmarkingDashboardContent() {
     buildingError,
     loadingProgress,
     loadingPercentage,
+    dataDateRange,
     loadClinicalData,
-    loadBuildingData
+    loadBuildingData,
+    loadAdditionalData
   } = useData()
   
   const [allData, setAllData] = useState<MaintenanceOrder[]>([])
@@ -308,22 +310,46 @@ export default function BenchmarkingDashboardContent() {
     applyFilters()
   }, [applyFilters])
 
-  // Calculate data range from all data (not filtered)
-  const dataRange = React.useMemo(() => {
-    const dates = allData
-      .map(order => order.abertura)
-      .filter(date => date)
-      .map(date => new Date(date!))
-      .sort((a, b) => a.getTime() - b.getTime())
-    
-    if (dates.length >= 2) {
-      return {
-        start: dates[0],
-        end: dates[dates.length - 1]
+  // Handle loading older data when user requests dates outside current range
+  const handleLoadOlderData = useCallback(async (dateRange: { start: Date; end: Date }) => {
+    try {
+      if (dataType === 'clinical') {
+        await loadAdditionalData('clinical', dateRange);
+      } else {
+        await loadAdditionalData('building', dateRange);
       }
+    } catch (error) {
+      console.error('Error loading additional data:', error);
     }
-    return null
-  }, [allData])
+  }, [dataType, loadAdditionalData]);
+
+  // Handle period selection
+  const handlePeriodSelect = useCallback(async (period: 'month' | 'quarter' | 'semester') => {
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'quarter':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      case 'semester':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        break;
+    }
+
+    try {
+      if (dataType === 'clinical') {
+        await loadClinicalData({ start: startDate, end: now });
+      } else {
+        await loadBuildingData({ start: startDate, end: now });
+      }
+    } catch (error) {
+      console.error('Error loading period data:', error);
+    }
+  }, [dataType, loadClinicalData, loadBuildingData]);
 
   // Process data for equipment count by company
   const equipmentCountData = React.useMemo(() => {
@@ -749,7 +775,9 @@ export default function BenchmarkingDashboardContent() {
           onSingleSelectChange={handleSingleSelectChange}
           onMultiSelectChange={handleMultiSelectChange}
           onClearFilters={clearFilters}
-          dataRange={dataRange}
+          dataRange={dataDateRange}
+          onLoadOlderData={handleLoadOlderData}
+          onPeriodSelect={handlePeriodSelect}
         />
 
         {(clinicalError || buildingError) && (
