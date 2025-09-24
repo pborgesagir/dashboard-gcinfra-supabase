@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -34,9 +34,24 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { signInWithEmail } = useAuth();
+  const { signInWithEmail, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
   const theme = useTheme();
+
+  // Redirecionar automaticamente após login bem-sucedido
+  useEffect(() => {
+    if (!authLoading && userProfile) {
+      // Redirecionar baseado no papel do usuário
+      if (userProfile.role === 'admin') {
+        router.push('/admin/dashboard');
+      } else if (userProfile.role === 'manager') {
+        router.push('/dashboard');
+      } else {
+        // Role desconhecido, redirecionar para página padrão
+        router.push('/dashboard');
+      }
+    }
+  }, [userProfile, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +64,8 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        router.push("/dashboard");
+        // O redirecionamento será feito automaticamente pelo useEffect do AuthContext
+        // após o profile do usuário ser carregado
       }
     } catch {
       setError("Ocorreu um erro inesperado");
