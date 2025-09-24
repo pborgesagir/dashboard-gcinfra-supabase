@@ -126,7 +126,7 @@ export default function KpiMetrics({ data, loading, equipamentosIndisponiveis = 
   return (
     <>
       {/* @ts-ignore */}
-      <Grid container spacing={3}>
+      <Grid container spacing={3} id="kpi-metrics">
         {kpis.map((kpi) => (
           /* @ts-ignore */
           <Grid item xs={12} sm={6} md={4} lg={true} key={kpi.title}>

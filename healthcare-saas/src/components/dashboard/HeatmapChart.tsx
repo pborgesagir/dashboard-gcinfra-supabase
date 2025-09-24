@@ -56,7 +56,7 @@ export default function HeatmapChart({ data, loading }: HeatmapChartProps) {
   }
 
   return (
-    <Card>
+    <Card id="heatmap-chart">
       <CardContent>
         <Typography variant="h6" gutterBottom>
           Padrão de Abertura de Ordens de Serviço por Dia da Semana e Horário

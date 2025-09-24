@@ -25,6 +25,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useData, MaintenanceOrder } from '@/contexts/DataContext'
 import FiltersSection from './FiltersSection'
+import PDFExportButton from '../ui/PDFExportButton'
+import { useActiveFilters } from '../../hooks/useActiveFilters'
 import EquipmentCountByCompanyChart from './EquipmentCountByCompanyChart'
 import CompanyStatusGauges from './CompanyStatusGauges'
 import CompanyTrendChart from './CompanyTrendChart'
@@ -87,6 +89,9 @@ export default function BenchmarkingDashboardContent() {
     situacao: [],
     possuiChamado: 'Todos'
   })
+
+  // Get active filters for PDF export
+  const activeFilters = useActiveFilters(filters)
 
   // Get unique values for filter options from current data
   const filterOptions = {
@@ -754,19 +759,28 @@ export default function BenchmarkingDashboardContent() {
           <Typography variant="h4">
             Dashboard de Benchmarking
           </Typography>
-          
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Tipo de Dados</InputLabel>
-            <Select
-              value={dataType}
-              label="Tipo de Dados"
-              onChange={(e) => setDataType(e.target.value as 'clinical' | 'building')}
-            >
+
+          <Box display="flex" gap={2} alignItems="center">
+            <PDFExportButton
+              activeFilters={activeFilters}
+              dataType={dataType}
+              totalRecords={filteredData.length}
+              disabled={clinicalLoading || buildingLoading || filteredData.length === 0}
+            />
+
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel>Tipo de Dados</InputLabel>
+              <Select
+                value={dataType}
+                label="Tipo de Dados"
+                onChange={(e) => setDataType(e.target.value as 'clinical' | 'building')}
+              >
               <MenuItem value="clinical">Engenharia Clínica</MenuItem>
               <MenuItem value="building">Engenharia Predial</MenuItem>
             </Select>
           </FormControl>
         </Box>
+      </Box>
 
         <FiltersSection
           filters={filters}
@@ -830,15 +844,15 @@ export default function BenchmarkingDashboardContent() {
         )}
 
         {/* Equipment Count and Status Gauges */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <EquipmentCountByCompanyChart 
+        <Grid container spacing={3} sx={{ mb: 4 }} id="equipment-status-section">
+          <Grid item xs={12} md={6} id="equipment-count-chart">
+            <EquipmentCountByCompanyChart
               data={equipmentCountData}
               loading={clinicalLoading || buildingLoading}
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <CompanyStatusGauges 
+          <Grid item xs={12} md={6} id="company-status-gauges">
+            <CompanyStatusGauges
               data={companyStatusData}
               loading={clinicalLoading || buildingLoading}
             />
@@ -846,7 +860,7 @@ export default function BenchmarkingDashboardContent() {
         </Grid>
 
         {/* OS Trend Chart */}
-        <Box mb={4}>
+        <Box mb={4} id="os-trend-chart">
           <CompanyTrendChart
             data={osTrendData.data}
             companies={osTrendData.companies}
@@ -857,7 +871,7 @@ export default function BenchmarkingDashboardContent() {
         </Box>
 
         {/* Planned Completion Rate Trend */}
-        <Box mb={4}>
+        <Box mb={4} id="completion-rate-trend">
           <CompanyTrendChart
             data={plannedCompletionTrendData.data}
             companies={plannedCompletionTrendData.companies}
@@ -869,7 +883,7 @@ export default function BenchmarkingDashboardContent() {
         </Box>
 
         {/* First Response Time Trend */}
-        <Box mb={4}>
+        <Box mb={4} id="response-time-trend">
           <CompanyTrendChart
             data={firstResponseTrendData.data}
             companies={firstResponseTrendData.companies}
@@ -881,7 +895,7 @@ export default function BenchmarkingDashboardContent() {
         </Box>
 
         {/* MTTR Trend */}
-        <Box mb={4}>
+        <Box mb={4} id="mttr-trend-chart">
           <CompanyTrendChart
             data={mttrTrendData.data}
             companies={mttrTrendData.companies}
@@ -893,8 +907,8 @@ export default function BenchmarkingDashboardContent() {
         </Box>
 
         {/* MTBF Benchmarking */}
-        <Box mb={4}>
-          <MTBFBenchmarkingChart 
+        <Box mb={4} id="mtbf-benchmarking-chart">
+          <MTBFBenchmarkingChart
             data={mtbfBenchmarkingData}
             loading={clinicalLoading || buildingLoading}
           />

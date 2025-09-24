@@ -47,7 +47,7 @@ export default function MaintenanceChart({ timeSeriesData, statusData, loading }
   }
 
   return (
-    <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={2}>
+    <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={2} id="maintenance-chart">
       <Card sx={{ flex: 1 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>

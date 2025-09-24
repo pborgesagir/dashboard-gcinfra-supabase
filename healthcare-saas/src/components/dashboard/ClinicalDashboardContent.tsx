@@ -34,6 +34,8 @@ import {
 } from '@mui/icons-material'
 import { useAuth } from '@/contexts/AuthContext'
 import { useData, MaintenanceOrder } from '@/contexts/DataContext'
+import { useActiveFilters } from '../../hooks/useActiveFilters'
+import PDFExportButton from '../ui/PDFExportButton'
 import KpiMetrics from './KpiMetrics'
 import MaintenanceChart from './MaintenanceChart'
 import HeatmapChart from './HeatmapChart'
@@ -93,6 +95,8 @@ export default function ClinicalDashboardContent() {
     situacao: [],
     possuiChamado: 'Todos'
   })
+
+  const activeFilters = useActiveFilters(filters)
 
   // Table state management
   const [tablePage, setTablePage] = useState(0)
@@ -913,6 +917,13 @@ export default function ClinicalDashboardContent() {
           <Typography variant="h4">
             Dashboard - Engenharia Clínica
           </Typography>
+
+          <PDFExportButton
+            activeFilters={activeFilters}
+            dataType="clinical"
+            totalRecords={filteredData.length}
+            disabled={clinicalLoading || filteredData.length === 0}
+          />
         </Box>
 
         <FiltersSection
@@ -977,17 +988,17 @@ export default function ClinicalDashboardContent() {
       )}
 
       {/* KPI Metrics */}
-      <Box mb={4}>
-        <KpiMetrics 
-          data={kpiData} 
-          loading={clinicalLoading} 
+      <Box mb={4} id="kpi-metrics">
+        <KpiMetrics
+          data={kpiData}
+          loading={clinicalLoading}
           equipamentosIndisponiveis={equipamentosIndisponiveis}
         />
       </Box>
 
       {/* Charts */}
-      <Box mb={4}>
-        <MaintenanceChart 
+      <Box mb={4} id="maintenance-chart">
+        <MaintenanceChart
           timeSeriesData={timeSeriesData}
           statusData={statusData}
           loading={clinicalLoading}
@@ -995,42 +1006,42 @@ export default function ClinicalDashboardContent() {
       </Box>
 
       {/* Heatmap */}
-      <Box mb={4}>
+      <Box mb={4} id="heatmap-chart">
         <HeatmapChart data={heatmapData} loading={clinicalLoading} />
       </Box>
 
       {/* Work Order Trend Chart */}
-      <Box mb={4}>
+      <Box mb={4} id="work-order-trend">
         <WorkOrderTrendChart data={workOrderTrendData} loading={clinicalLoading} />
       </Box>
 
       {/* Response Time Trend Chart */}
-      <Box mb={4}>
+      <Box mb={4} id="response-time-trend">
         <ResponseTimeTrendChart data={responseTimeData} loading={clinicalLoading} />
       </Box>
 
       {/* Taxa Cumprimento Planejada Chart */}
-      <Box mb={4}>
-        <TaxaCumprimentoPlanejadaChart 
+      <Box mb={4} id="taxa-cumprimento-chart">
+        <TaxaCumprimentoPlanejadaChart
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          data={taxaCumprimentoPlanejadaData.data as any} 
+          data={taxaCumprimentoPlanejadaData.data as any}
           tiposManutencao={taxaCumprimentoPlanejadaData.tiposManutencao}
-          loading={clinicalLoading} 
+          loading={clinicalLoading}
         />
       </Box>
 
       {/* Analysis Charts */}
       <Grid container spacing={3} mb={4}>
-        <Grid size={{ xs: 12, lg: 6 }}>
+        <Grid item xs={12} lg={6} id="causa-chart">
           <CausaChart data={causaData} loading={clinicalLoading} />
         </Grid>
-        <Grid size={{ xs: 12, lg: 6 }}>
+        <Grid item xs={12} lg={6} id="familia-chart">
           <FamiliaChart data={familiaData} loading={clinicalLoading} />
         </Grid>
-        <Grid size={{ xs: 12, lg: 6 }}>
+        <Grid item xs={12} lg={6} id="tipo-manutencao-chart">
           <TipoManutencaoChart data={tipoManutencaoData} loading={clinicalLoading} />
         </Grid>
-        <Grid size={{ xs: 12, lg: 6 }}>
+        <Grid item xs={12} lg={6} id="setor-chart">
           <SetorChart data={setorData} loading={clinicalLoading} />
         </Grid>
       </Grid>

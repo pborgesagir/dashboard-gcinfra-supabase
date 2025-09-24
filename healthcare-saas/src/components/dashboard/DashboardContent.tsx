@@ -49,6 +49,8 @@ import TipoManutencaoChart from './TipoManutencaoChart'
 import SetorChart from './SetorChart'
 import TaxaCumprimentoPlanejadaChart from './TaxaCumprimentoPlanejadaChart'
 import FiltersSection from './FiltersSection'
+import PDFExportButton from '../ui/PDFExportButton'
+import { useActiveFilters } from '../../hooks/useActiveFilters'
 
 interface MaintenanceOrder {
   id: number
@@ -974,6 +976,9 @@ export default function DashboardContent() {
     }
   })()
 
+  // Get active filters for PDF export
+  const activeFilters = useActiveFilters(filters)
+
   // Identify currently unavailable equipment (corrective maintenance in progress)
   const equipamentosIndisponiveis = React.useMemo(() => {
     return filteredData.filter(order => 
@@ -1030,18 +1035,27 @@ export default function DashboardContent() {
           <Typography variant="h4">
             Dashboard - {dataType === 'clinical' ? 'Engenharia Clínica' : 'Engenharia Predial'}
           </Typography>
-          
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Tipo de Dados</InputLabel>
-            <Select
-              value={dataType}
-              label="Tipo de Dados"
-              onChange={(e) => setDataType(e.target.value as 'clinical' | 'building')}
-            >
-              <MenuItem value="clinical">Engenharia Clínica</MenuItem>
-              <MenuItem value="building">Engenharia Predial</MenuItem>
-            </Select>
-          </FormControl>
+
+          <Box display="flex" gap={2} alignItems="center">
+            <PDFExportButton
+              activeFilters={activeFilters}
+              dataType={dataType}
+              totalRecords={filteredData.length}
+              disabled={loading || filteredData.length === 0}
+            />
+
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel>Tipo de Dados</InputLabel>
+              <Select
+                value={dataType}
+                label="Tipo de Dados"
+                onChange={(e) => setDataType(e.target.value as 'clinical' | 'building')}
+              >
+                <MenuItem value="clinical">Engenharia Clínica</MenuItem>
+                <MenuItem value="building">Engenharia Predial</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </Box>
 
         <FiltersSection
@@ -1116,21 +1130,21 @@ export default function DashboardContent() {
       </Box>
 
       {/* Work Order Trend Chart */}
-      <Box mb={4}>
+      <Box mb={4} id="work-order-trend">
         <WorkOrderTrendChart data={workOrderTrendData} loading={loading} />
       </Box>
 
       {/* Response Time Trend Chart */}
-      <Box mb={4}>
+      <Box mb={4} id="response-time-trend">
         <ResponseTimeTrendChart data={responseTimeData} loading={loading} />
       </Box>
 
       {/* Taxa Cumprimento Planejada Chart */}
-      <Box mb={4}>
-        <TaxaCumprimentoPlanejadaChart 
-          data={taxaCumprimentoPlanejadaData.data} 
+      <Box mb={4} id="taxa-cumprimento-chart">
+        <TaxaCumprimentoPlanejadaChart
+          data={taxaCumprimentoPlanejadaData.data}
           tiposManutencao={taxaCumprimentoPlanejadaData.tiposManutencao}
-          loading={loading} 
+          loading={loading}
         />
       </Box>
 
@@ -1139,19 +1153,19 @@ export default function DashboardContent() {
       {/* @ts-ignore */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* @ts-ignore */}
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12} lg={6} id="causa-chart">
           <CausaChart data={causaData} loading={loading} />
         </Grid>
         {/* @ts-ignore */}
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12} lg={6} id="familia-chart">
           <FamiliaChart data={familiaData} loading={loading} />
         </Grid>
         {/* @ts-ignore */}
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12} lg={6} id="tipo-manutencao-chart">
           <TipoManutencaoChart data={tipoManutencaoData} loading={loading} />
         </Grid>
         {/* @ts-ignore */}
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12} lg={6} id="setor-chart">
           <SetorChart data={setorData} loading={loading} />
         </Grid>
       </Grid>
