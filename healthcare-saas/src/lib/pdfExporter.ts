@@ -184,11 +184,13 @@ export class PDFExporter {
 
       // Label do filtro
       this.pdf.setFont('helvetica', 'bold')
-      this.pdf.text(`${filter.label}:`, this.margin + 5, yPos)
+      this.pdf.text(`${filter.label}: `, this.margin + 5, yPos)
+
+      // Calcular largura do label em bold para posicionar o valor corretamente
+      const labelWidth = this.pdf.getTextWidth(`${filter.label}: `)
 
       // Valor do filtro
       this.pdf.setFont('helvetica', 'normal')
-      const labelWidth = this.pdf.getTextWidth(`${filter.label}: `)
       const maxValueWidth = this.pageWidth - this.margin - labelWidth - 30
 
       let value = filter.value
