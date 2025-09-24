@@ -81,13 +81,48 @@ export class PDFExporter {
 
       logoImg.onload = () => {
         try {
-          // Adicionar logo no canto superior direito
-          const logoWidth = 30
-          const logoHeight = 30
-          const logoX = this.pageWidth - this.margin - logoWidth
-          const logoY = 10
+          // Criar um canvas para converter o logo para branco
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
 
-          this.pdf.addImage(logoImg, 'PNG', logoX, logoY, logoWidth, logoHeight)
+          if (!ctx) {
+            reject(new Error('Não foi possível criar contexto do canvas'))
+            return
+          }
+
+          canvas.width = logoImg.width
+          canvas.height = logoImg.height
+
+          // Desenhar a imagem original
+          ctx.drawImage(logoImg, 0, 0)
+
+          // Aplicar filtro branco (inversão de cor para transformar em branco)
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const data = imageData.data
+
+          for (let i = 0; i < data.length; i += 4) {
+            // Converter para branco mantendo a transparência
+            const alpha = data[i + 3]
+            if (alpha > 0) {
+              data[i] = 255     // R
+              data[i + 1] = 255 // G
+              data[i + 2] = 255 // B
+              // Manter alpha original
+            }
+          }
+
+          ctx.putImageData(imageData, 0, 0)
+
+          // Adicionar logo branco no canto superior direito (mais no topo)
+          const logoWidth = 25
+          const logoHeight = 25
+          const logoX = this.pageWidth - this.margin - logoWidth - 5
+          const logoY = 5 // Posição mais no topo
+
+          // Converter canvas para data URL e adicionar ao PDF
+          const whiteLogoDataURL = canvas.toDataURL('image/png')
+          this.pdf.addImage(whiteLogoDataURL, 'PNG', logoX, logoY, logoWidth, logoHeight)
+
           resolve()
         } catch (error) {
           reject(error)
