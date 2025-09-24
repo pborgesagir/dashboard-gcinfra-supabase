@@ -18,7 +18,6 @@ import {
   TableRow,
   TablePagination,
   TableSortLabel,
-  Button,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -133,7 +132,7 @@ export default function BuildingDashboardContent() {
         console.error('🏗️ BuildingDashboardContent: loadBuildingData failed:', error);
         console.error('🏗️ Error details:', JSON.stringify(error, null, 2));
       });
-  }, [loadBuildingData])
+  }, [loadBuildingData, buildingData.length, buildingLoaded, buildingLoading, dataDateRange])
 
   // Apply all filters to the data (same logic as clinical)
   const applyFilters = useCallback(() => {

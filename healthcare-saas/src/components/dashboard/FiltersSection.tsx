@@ -18,7 +18,6 @@ import {
   IconButton,
   Badge,
   Button,
-  ButtonGroup,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { SelectChangeEvent } from "@mui/material/Select";
@@ -123,7 +122,6 @@ export default function FiltersSection({
     if (!dataRange || !onLoadOlderData) return false;
 
     const currentStart = dataRange.start;
-    const currentEnd = dataRange.end;
 
     // Check if any date filter is outside the current range
     if (filters.aberturaStartDate && filters.aberturaStartDate < currentStart) return true;

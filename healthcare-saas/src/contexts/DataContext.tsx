@@ -277,9 +277,6 @@ export function DataProvider({ children }: DataProviderProps) {
               }
 
               // Skip to data loading with manual count
-              // Set totalRecords to manual count and continue
-              const totalRecords = manualCount;
-
               // Continue with data query (we'll modify this below)
             } else {
               console.error('❌ Fallback strategy also failed:', fallbackError);
@@ -406,7 +403,7 @@ export function DataProvider({ children }: DataProviderProps) {
 
       return allOrders;
     },
-    [userProfile, isAdmin, fetchBuildingDataWithoutCount]
+    [userProfile, isAdmin]
   );
 
   const loadClinicalData = useCallback(async (
@@ -840,7 +837,7 @@ export function DataProvider({ children }: DataProviderProps) {
         updateState({ loadingProgress: "", loadingPercentage: 0 });
       }, 2000);
     },
-    [fetchDataWithPagination, updateState]
+    [fetchDataWithPagination, updateState, refreshData, state.dataDateRange]
   );
 
   const contextValue: DataContextType = {
